@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+websockets
+supabase
+redis
+celery
+groq
+twilio
+httpx
+python-dotenv
+pydantic
+pydantic-settings
+passlib[bcrypt]
+python-jose[cryptography]
