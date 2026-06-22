@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saral AI - Voice Client Test Bench</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #F5D000;
+      --primary-dark: #C9A800;
+      --on-primary: #1A1A1A;
+      --secondary: #E8622A;
+      --on-secondary: #FFFFFF;
+      --tertiary: #D4EAC8;
+      --on-tertiary: #1A1A1A;
+      --neutral: #FAFAF5;
+      --surface: #FFFFFF;
+      --on-surface: #1A1A1A;
+      --on-surface-variant: #3D3D3D;
+      --outline: #E2E2D8;
+      --muted: #8A8A8A;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--neutral);
+      color: var(--on-surface);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .header {
+      text-align: center;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--on-surface-variant);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .eyebrow::before {
+      content: "●";
+      color: var(--primary);
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 5vw, 3rem);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--on-surface);
+    }
+
+    .card {
+      background-color: var(--surface);
+      border: 1px solid var(--outline);
+      border-radius: 24px;
+      padding: 32px;
+      width: 100%;
+      box-shadow: 0 2px 8px rgba(26,26,26,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 120px;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+    }
+
+    input, select {
+      background-color: var(--surface);
+      border: 1.5px solid var(--outline);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 15px;
+      color: var(--on-surface);
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.15s ease;
+      width: 100%;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+    }
+
+    .conn-status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--neutral);
+      border-radius: 12px;
+      padding: 12px 16px;
+      border: 1px solid var(--outline);
+    }
+
+    .status-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--muted);
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .status-dot.connected {
+      background-color: #4b8a24;
+      box-shadow: 0 0 8px rgba(75, 138, 36, 0.4);
+    }
+
+    .status-dot.connecting {
+      background-color: var(--primary);
+      box-shadow: 0 0 8px rgba(245, 208, 0, 0.4);
+    }
+
+    .status-dot.disconnected {
+      background-color: var(--secondary);
+      box-shadow: 0 0 8px rgba(232, 98, 42, 0.4);
+    }
+
+    .btn-connect {
+      background-color: transparent;
+      border: 1.5px solid var(--on-surface);
+      color: var(--on-surface);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn-connect:hover {
+      background-color: rgba(26, 26, 26, 0.06);
+    }
+
+    .visualizer-container {
+      height: 100px;
+      background-color: var(--neutral);
+      border-radius: 16px;
+      border: 1px solid var(--outline);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .visualizer-placeholder {
+      position: absolute;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 500;
+      pointer-events: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .btn-record {
+      border-radius: 9999px;
+      background-color: var(--primary);
+      color: var(--on-primary);
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 16px 32px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .btn-record:hover {
+      background-color: var(--primary-dark);
+    }
+
+    .btn-record:active {
+      transform: scale(0.98);
+    }
+
+    .btn-record.recording {
+      background-color: var(--secondary);
+      color: var(--on-secondary);
+    }
+
+    .btn-record.recording:hover {
+      background-color: #d15120;
+    }
+
+    .latency-card {
+      background-color: var(--tertiary);
+      color: var(--on-tertiary);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(26,26,26,0.02);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .latency-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--on-tertiary);
+      opacity: 0.8;
+    }
+
+    .latency-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+    }
+
+    .log-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .log-container {
+      background-color: var(--neutral);
+      border: 1px solid var(--outline);
+      border-radius: 16px;
+      padding: 20px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .log-item {
+      font-size: 14px;
+      line-height: 1.5;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(226, 226, 216, 0.5);
+    }
+
+    .log-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .log-sender {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 2px;
+    }
+
+    .sender-user {
+      color: var(--secondary);
+    }
+
+    .sender-ai {
+      color: #4b8a24;
+    }
+
+    .sender-system {
+      color: var(--muted);
+    }
+
+    .log-text {
+      font-weight: 500;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <div class="eyebrow">Local Test Bench</div>
+      <h1>Saral AI Voice Client</h1>
+    </div>
+
+    <div class="card">
+      <!-- WS Config Group -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="ws-url">WebSocket Endpoint URL</label>
+          <input type="text" id="ws-url" value="ws://localhost:8000/ws/call">
+        </div>
+        <div class="form-group">
+          <label for="ws-lang">Language</label>
+          <select id="ws-lang">
+            <option value="en-IN">English (India)</option>
+            <option value="hi-IN">Hindi (हिन्दी)</option>
+            <option value="ta-IN">Tamil (தமிழ்)</option>
+            <option value="te-IN">Telugu (తెలుగు)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- WebSocket Connection Status -->
+      <div class="conn-status-bar">
+        <div style="display: flex; align-items: center;">
+          <span id="status-dot" class="status-dot disconnected"></span>
+          <span id="status-text" class="status-text">Disconnected</span>
+        </div>
+        <button id="btn-connect" class="btn-connect" onclick="toggleWebSocket()">Connect</button>
+      </div>
+
+      <!-- Visualizer Waveform -->
+      <div class="visualizer-container">
+        <span id="visualizer-placeholder" class="visualizer-placeholder">Waveform Visualizer</span>
+        <canvas id="visualizer"></canvas>
+      </div>
+
+      <!-- Start/Stop Recording Button -->
+      <button id="btn-record" class="btn-record" onclick="toggleRecording()" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+        <span>Start Recording</span>
+      </button>
+
+      <!-- Latency Display -->
+      <div id="latency-card" class="latency-card hidden">
+        <span class="latency-title">Stop-To-Play Latency</span>
+        <span id="latency-value" class="latency-value">0 ms</span>
+      </div>
+
+      <!-- Transcript & System Log Section -->
+      <div class="log-section">
+        <label>Conversation Log</label>
+        <div id="log-container" class="log-container">
+          <div class="log-item">
+            <div class="log-sender sender-system">System</div>
+            <div class="log-text">Welcome. Connect to the WebSocket and click "Start Recording" to speak.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let audioCtx = null;
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+    let ttsChunks = [];
+    
+    // Timing metrics
+    let stoppedSpeakingTime = null;
+
+    // Streaming playback state
+    let mediaSource = null;
+    let sourceBuffer = null;
+    let mseQueue = [];
+    let mseUse = true;
+    let nextPlayTime = 0;
+    let firstChunkPlayed = false;
+    let fallbackBuffer = new Uint8Array(0);
+
+    async function initStreamingPlayback() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+      
+      mseQueue = [];
+      mseUse = true;
+      nextPlayTime = audioCtx.currentTime;
+      firstChunkPlayed = false;
+      fallbackBuffer = new Uint8Array(0);
+
+      // Check if MediaSource is supported and supports MP3
+      if (window.MediaSource && MediaSource.isTypeSupported('audio/mpeg')) {
+        let audioEl = document.getElementById('streaming-audio');
+        if (!audioEl) {
+          audioEl = document.createElement('audio');
+          audioEl.id = 'streaming-audio';
+          document.body.appendChild(audioEl);
+        }
+        audioEl.src = '';
+        
+        mediaSource = new MediaSource();
+        audioEl.src = URL.createObjectURL(mediaSource);
+        
+        mediaSource.addEventListener('sourceopen', () => {
+          try {
+            sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+            sourceBuffer.addEventListener('updateend', () => {
+              if (mseQueue.length > 0 && !sourceBuffer.updating) {
+                sourceBuffer.appendBuffer(mseQueue.shift());
+              }
+            });
+            sourceBuffer.addEventListener('error', (e) => {
+              console.error("SourceBuffer error, falling back to Web Audio API:", e);
+              mseUse = false;
+            });
+          } catch (e) {
+            console.error("addSourceBuffer failed, falling back to Web Audio API:", e);
+            mseUse = false;
+          }
+        });
+        
+        audioEl.onplaying = () => {
+          if (!firstChunkPlayed && stoppedSpeakingTime) {
+            firstChunkPlayed = true;
+            const latency = performance.now() - stoppedSpeakingTime;
+            document.getElementById('latency-value').innerText = `${latency.toFixed(0)} ms`;
+            document.getElementById('latency-card').classList.remove('hidden');
+            addLog("System", `MSE Playback Started. Latency (stopped speaking to first sound): ${latency.toFixed(0)} ms`);
+          }
+        };
+
+        audioEl.onerror = (e) => {
+          console.error("Audio element error, falling back to Web Audio API:", e);
+          mseUse = false;
+        };
+
+        audioEl.play().catch(err => console.log("Audio play deferred:", err));
+      } else {
+        console.log("MediaSource or audio/mpeg not supported, falling back to Web Audio API.");
+        mseUse = false;
+      }
+    }
+
+    function handleAudioChunk(arrayBuffer) {
+      if (mseUse && mediaSource && mediaSource.readyState === 'open' && sourceBuffer) {
+        if (!sourceBuffer.updating && mseQueue.length === 0) {
+          try {
+            sourceBuffer.appendBuffer(arrayBuffer);
+          } catch (e) {
+            console.error("appendBuffer failed, falling back:", e);
+            mseUse = false;
+            decodeAndPlayChunkFallback(arrayBuffer);
+          }
+        } else {
+          mseQueue.push(arrayBuffer);
+        }
+      } else {
+        decodeAndPlayChunkFallback(arrayBuffer);
+      }
+    }
+
+    function decodeAndPlayChunkFallback(arrayBuffer) {
+      // Append the new chunk to fallbackBuffer
+      let newBuffer = new Uint8Array(fallbackBuffer.length + arrayBuffer.byteLength);
+      newBuffer.set(fallbackBuffer, 0);
+      newBuffer.set(new Uint8Array(arrayBuffer), fallbackBuffer.length);
+      fallbackBuffer = newBuffer;
+
+      // Try to decode the accumulated fallbackBuffer
+      audioCtx.decodeAudioData(fallbackBuffer.buffer.slice(0), (audioBuffer) => {
+        // Success! Clear the fallback buffer since this portion is decoded
+        fallbackBuffer = new Uint8Array(0);
+
+        let startTime = Math.max(audioCtx.currentTime, nextPlayTime);
+        let source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start(startTime);
+        
+        nextPlayTime = startTime + audioBuffer.duration;
+
+        if (!firstChunkPlayed && stoppedSpeakingTime) {
+          firstChunkPlayed = true;
+          const latency = performance.now() - stoppedSpeakingTime;
+          document.getElementById('latency-value').innerText = `${latency.toFixed(0)} ms`;
+          document.getElementById('latency-card').classList.remove('hidden');
+          addLog("System", `Web Audio Fallback Playback Started. Latency (stopped speaking to first sound): ${latency.toFixed(0)} ms`);
+        }
+      }, (err) => {
+        // Decoding failed (likely waiting for more MP3 frames)
+        console.log("decodeAudioData failed, waiting for more chunks...");
+      });
+    }
+
+    function finishStreamingPlayback() {
+      if (mseUse && mediaSource && mediaSource.readyState === 'open') {
+        let checkEnd = setInterval(() => {
+          if (mseQueue.length === 0 && (!sourceBuffer || !sourceBuffer.updating)) {
+            clearInterval(checkEnd);
+            try {
+              mediaSource.endOfStream();
+              addLog("AI", "[Playing Audio Response via MSE]");
+            } catch(e) {
+              console.log("endOfStream error:", e);
+            }
+          }
+        }, 100);
+      } else {
+        addLog("AI", "[Playing Audio Response via Web Audio Fallback]");
+      }
+    }
+
+    // Visualizer variables
+    let analyser = null;
+    const canvas = document.getElementById('visualizer');
+    const canvasCtx = canvas.getContext('2d');
+
+    // Auto-resize visualizer canvas
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function updateStatus(text, type = 'disconnected') {
+      const dot = document.getElementById('status-dot');
+      const label = document.getElementById('status-text');
+      const connectBtn = document.getElementById('btn-connect');
+      const recordBtn = document.getElementById('btn-record');
+
+      label.innerText = text;
+      dot.className = `status-dot ${type}`;
+
+      if (type === 'connected') {
+        connectBtn.innerText = 'Disconnect';
+        recordBtn.disabled = false;
+      } else if (type === 'connecting') {
+        connectBtn.innerText = 'Connecting...';
+        recordBtn.disabled = true;
+      } else {
+        connectBtn.innerText = 'Connect';
+        recordBtn.disabled = true;
+        if (isRecording) {
+          stopRecordingSilently();
+        }
+      }
+    }
+
+    function toggleWebSocket() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      } else {
+        connectWebSocket();
+      }
+    }
+
+    function connectWebSocket() {
+      const baseUrl = document.getElementById('ws-url').value.trim();
+      const language = document.getElementById('ws-lang').value;
+      const wsUrl = `${baseUrl}?language=${language}`;
+
+      updateStatus("Connecting...", "connecting");
+      addLog("System", `Connecting to ${wsUrl}...`);
+
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = () => {
+          updateStatus("Connected", "connected");
+          addLog("System", "WebSocket connection opened.");
+        };
+
+        ws.onmessage = async (event) => {
+          if (typeof event.data === 'string') {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.status === 'transcribed') {
+                addLog("User", data.text);
+              } else if (data.status === 'tts_start') {
+                addLog("System", "TTS Stream starting...");
+                await initStreamingPlayback();
+              } else if (data.status === 'tts_end') {
+                addLog("System", `TTS Stream completed.`);
+                finishStreamingPlayback();
+              } else if (data.error) {
+                addLog("System", `Server Error: ${data.error}`);
+              }
+            } catch (e) {
+              addLog("System", `Raw message: ${event.data}`);
+            }
+          } else if (event.data instanceof ArrayBuffer) {
+            // Received audio chunk
+            handleAudioChunk(event.data);
+          }
+        };
+
+        ws.onclose = (e) => {
+          updateStatus("Disconnected", "disconnected");
+          addLog("System", `WebSocket connection closed. (Code: ${e.code})`);
+        };
+
+        ws.onerror = (err) => {
+          addLog("System", "WebSocket error occurred.");
+          updateStatus("Error", "disconnected");
+        };
+
+      } catch (err) {
+        addLog("System", `Failed to instantiate WebSocket: ${err.message}`);
+        updateStatus("Disconnected", "disconnected");
+      }
+    }
+
+    function addLog(sender, text) {
+      const container = document.getElementById('log-container');
+      const item = document.createElement('div');
+      item.className = 'log-item';
+
+      let senderClass = 'sender-system';
+      if (sender === 'User') senderClass = 'sender-user';
+      if (sender === 'AI') senderClass = 'sender-ai';
+
+      item.innerHTML = `
+        <div class="log-sender ${senderClass}">${sender}</div>
+        <div class="log-text">${text}</div>
+      `;
+      container.appendChild(item);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function toggleRecording() {
+      if (isRecording) {
+        await stopRecording();
+      } else {
+        await startRecording();
+      }
+    }
+
+    async function startRecording() {
+      recordedChunks = [];
+
+      if (!mediaStream) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err) {
+          addLog("System", `Microphone permission denied: ${err.message}`);
+          return;
+        }
+      }
+
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      // Configure media source and analyser
+      const sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      sourceNode.connect(analyser);
+
+      // Select mime type
+      let options = {};
+      if (MediaRecorder.isTypeSupported('audio/webm')) {
+        options = { mimeType: 'audio/webm' };
+      } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+        options = { mimeType: 'audio/ogg' };
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        options = { mimeType: 'audio/mp4' };
+      }
+
+      mediaRecorder = new MediaRecorder(mediaStream, options);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const arrayBuffer = await blob.arrayBuffer();
+
+        // Mark the time speaking stopped
+        stoppedSpeakingTime = performance.now();
+        addLog("System", "Speech recording stopped. Transmitting audio...");
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(arrayBuffer);
+        } else {
+          addLog("System", "WebSocket disconnected, cannot send audio.");
+        }
+      };
+
+      // Hide visualizer placeholder
+      document.getElementById('visualizer-placeholder').classList.add('hidden');
+
+      mediaRecorder.start();
+      isRecording = true;
+
+      const recordBtn = document.getElementById('btn-record');
+      recordBtn.classList.add('recording');
+      recordBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="6" width="12" height="12" rx="2" />
+        </svg>
+        <span>Stop Recording</span>
+      `;
+
+      addLog("System", "Recording started... Speak now.");
+      drawVisualizer();
+    }
+
+    async function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+
+      const recordBtn = document.getElementById('btn-record');
+      recordBtn.classList.remove('recording');
+      recordBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+        <span>Start Recording</span>
+      `;
+    }
+
+    function stopRecordingSilently() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+      const recordBtn = document.getElementById('btn-record');
+      recordBtn.classList.remove('recording');
+      recordBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+        <span>Start Recording</span>
+      `;
+    }
+
+    function drawVisualizer() {
+      if (!isRecording) {
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('visualizer-placeholder').classList.remove('hidden');
+        return;
+      }
+
+      requestAnimationFrame(drawVisualizer);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteTimeDomainData(dataArray);
+
+      canvasCtx.fillStyle = '#FAFAF5';
+      canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+      canvasCtx.lineWidth = 3;
+      canvasCtx.strokeStyle = '#E8622A'; // Secondary orange
+      canvasCtx.beginPath();
+
+      const sliceWidth = canvas.width * 1.0 / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * canvas.height / 2;
+
+        if (i === 0) {
+          canvasCtx.moveTo(x, y);
+        } else {
+          canvasCtx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+
+      canvasCtx.lineTo(canvas.width, canvas.height / 2);
+      canvasCtx.stroke();
+    }
+
+    async function playAudio(arrayBuffer) {
+      const audioStartPlayingTime = performance.now();
+      addLog("System", "Received audio response. Decoding...");
+
+      try {
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start(0);
+
+        addLog("AI", "[Playing Audio Response]");
+
+        // Latency computation
+        if (stoppedSpeakingTime) {
+          const latency = audioStartPlayingTime - stoppedSpeakingTime;
+          document.getElementById('latency-value').innerText = `${latency.toFixed(0)} ms`;
+          document.getElementById('latency-card').classList.remove('hidden');
+          addLog("System", `Turn Latency (stopped speaking to playing): ${latency.toFixed(0)} ms`);
+        }
+      } catch (err) {
+        addLog("System", `Audio decoding failed: ${err.message}`);
+        console.error(err);
+      }
+    }
+
+    // Auto connect WebSocket on load
+    window.addEventListener('DOMContentLoaded', () => {
+      connectWebSocket();
+    });
+  </script>
+</body>
+</html>

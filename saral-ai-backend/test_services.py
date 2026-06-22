@@ -15,7 +15,7 @@ from groq import GroqError
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.services.sarvam import speech_to_text, text_to_speech, _normalize_language_code
+from app.services.sarvam import speech_to_text, text_to_speech, text_to_speech_stream, _normalize_language_code
 from app.services.groq_llm import get_response
 
 class TestServices(unittest.TestCase):
@@ -81,6 +81,65 @@ class TestServices(unittest.TestCase):
             self.assertEqual(post_args[0][0], "https://api.sarvam.ai/text-to-speech")
             self.assertEqual(post_args[1]["json"]["model"], "bulbul:v3")
             self.assertEqual(post_args[1]["json"]["target_language_code"], "hi-IN")
+            self.assertEqual(post_args[1]["json"]["speech_sample_rate"], 16000)
+            self.assertEqual(post_args[1]["json"]["output_format"], "mp3")
+
+    @patch("httpx.AsyncClient")
+    def test_text_to_speech_stream_mocked(self, mock_async_client):
+        """Test text_to_speech_stream async generator under mock."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        
+        async def mock_aiter_bytes():
+            yield b"chunk-a"
+            yield b"chunk-b"
+            
+        mock_response.aiter_bytes = mock_aiter_bytes
+        
+        mock_client_instance = MagicMock()
+        # Mock AsyncClient context manager
+        async def async_enter(*args, **kwargs):
+            return mock_client_instance
+        async def async_exit(*args, **kwargs):
+            pass
+        mock_async_client.return_value.__aenter__ = async_enter
+        mock_async_client.return_value.__aexit__ = async_exit
+        
+        # Mock stream context manager
+        mock_stream_ctx = MagicMock()
+        async def stream_enter(*args, **kwargs):
+            return mock_response
+        async def stream_exit(*args, **kwargs):
+            pass
+        mock_stream_ctx.__aenter__ = stream_enter
+        mock_stream_ctx.__aexit__ = stream_exit
+        mock_client_instance.stream.return_value = mock_stream_ctx
+        
+        import asyncio
+        
+        async def run_test():
+            chunks = []
+            async for chunk in text_to_speech_stream("Test stream", "hi"):
+                chunks.append(chunk)
+            return chunks
+
+        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key"}):
+            loop = asyncio.new_event_loop()
+            try:
+                chunks = loop.run_until_complete(run_test())
+            finally:
+                loop.close()
+                
+            self.assertEqual(chunks, [b"chunk-a", b"chunk-b"])
+            
+            # Verify stream call parameters
+            stream_args = mock_client_instance.stream.call_args
+            self.assertEqual(stream_args[0][0], "POST")
+            self.assertEqual(stream_args[0][1], "https://api.sarvam.ai/text-to-speech/stream")
+            self.assertEqual(stream_args[1]["json"]["model"], "bulbul:v3")
+            self.assertEqual(stream_args[1]["json"]["target_language_code"], "hi-IN")
+            self.assertEqual(stream_args[1]["json"]["speech_sample_rate"], 16000)
+            self.assertEqual(stream_args[1]["json"]["output_audio_codec"], "mp3")
 
     @patch("app.services.groq_llm.Groq")
     def test_groq_llm_mocked(self, mock_groq):
@@ -150,7 +209,8 @@ class TestServices(unittest.TestCase):
             response = get_response("Hi, I want to talk to sales.", history)
             self.assertIsInstance(response, str)
             self.assertTrue(len(response) > 0)
-            print(f"Success! Assistant response: '{response}'")
+            safe_response = response.encode('ascii', 'backslashreplace').decode('ascii')
+            print(f"Success! Assistant response: '{safe_response}'")
         except Exception as e:
             self.fail(f"Real Groq LLM integration failed: {e}")
 
