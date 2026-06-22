@@ -6,7 +6,8 @@ Handles interaction with Groq API for generating receptionist responses.
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-from groq import Groq, GroqError
+import httpx
+from groq import Groq, GroqError, APITimeoutError, APIStatusError
 
 # Load environment variables from .env if present
 load_dotenv()
@@ -31,7 +32,10 @@ def get_response(user_message: str, conversation_history: List[Dict[str, Any]]) 
     if not api_key or api_key == "placeholder-groq-key":
         raise ValueError("GROQ_API_KEY environment variable is not set or contains a placeholder value.")
 
-    model = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+    # Using "openai/gpt-oss-20b" as the default model.
+    # Note: "llama3-8b-8192" was decommissioned/deprecated on June 17, 2026.
+    # "openai/gpt-oss-20b" is Groq's recommended fast-inference replacement.
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
     
     try:
         client = Groq(api_key=api_key)
@@ -74,6 +78,14 @@ def get_response(user_message: str, conversation_history: List[Dict[str, Any]]) 
             raise RuntimeError("Received an empty response from Groq LLM API.")
             
         return chat_completion.choices[0].message.content
+    except APITimeoutError as te:
+        raise httpx.TimeoutException(f"Groq LLM timeout: {str(te)}") from te
+    except APIStatusError as se:
+        raise httpx.HTTPStatusError(
+            f"Groq LLM status error {se.status_code}: {str(se)}",
+            request=se.request,
+            response=se.response
+        ) from se
     except GroqError as ge:
         raise RuntimeError(f"Groq API error occurred: {str(ge)}") from ge
     except Exception as e:
