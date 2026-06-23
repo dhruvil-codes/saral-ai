@@ -3,7 +3,7 @@
 Always read `DESIGN.md` before generating any UI code, component, or layout.
 
 - Use only the color tokens defined in `DESIGN.md`. Never hardcode hex values.
-- Use Syne (700–800w) for all display text, Inter (400/500/600w) for all body and UI text.
+- Use Fraunces (Medium 500w) for all display text, Geist for all body and UI text.
 - Follow the component specs exactly: pill shapes for buttons/badges only, `rounded.xl` for cards.
 - Apply the flat elevation model: 1px borders over shadows, max `box-shadow` blur 24px.
 - Use the 12-column grid, 1160px max-width, 96px section rhythm.

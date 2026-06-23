@@ -6,7 +6,7 @@
   <title>Saral AI - Voice Client Test Bench</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #F5D000;
@@ -33,7 +33,7 @@
     body {
       background-color: var(--neutral);
       color: var(--on-surface);
-      font-family: 'Inter', sans-serif;
+      font-family: 'Geist', sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -73,12 +73,17 @@
     }
 
     h1 {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
+      font-family: 'Fraunces', serif;
+      font-weight: 500;
       font-size: clamp(2rem, 5vw, 3rem);
       line-height: 1.1;
       letter-spacing: -0.02em;
       color: var(--on-surface);
+      font-optical-sizing: auto;
+      font-style: normal;
+      font-variation-settings:
+        "SOFT" 0,
+        "WONK" 0;
     }
 
     .card {
@@ -118,7 +123,7 @@
       padding: 12px 16px;
       font-size: 15px;
       color: var(--on-surface);
-      font-family: 'Inter', sans-serif;
+      font-family: 'Geist', sans-serif;
       outline: none;
       transition: border-color 0.15s ease;
       width: 100%;
@@ -213,7 +218,7 @@
       border-radius: 9999px;
       background-color: var(--primary);
       color: var(--on-primary);
-      font-family: 'Inter', sans-serif;
+      font-family: 'Geist', sans-serif;
       font-weight: 600;
       font-size: 15px;
       padding: 16px 32px;
@@ -266,9 +271,14 @@
     }
 
     .latency-value {
-      font-family: 'Syne', sans-serif;
+      font-family: 'Fraunces', serif;
       font-size: 32px;
-      font-weight: 800;
+      font-weight: 500;
+      font-optical-sizing: auto;
+      font-style: normal;
+      font-variation-settings:
+        "SOFT" 0,
+        "WONK" 0;
     }
 
     .log-section {

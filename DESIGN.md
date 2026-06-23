@@ -1,12 +1,13 @@
 ---
 version: alpha
+reference of the Entire Design is from: https://saybriefly.com/
 name: Saral AI
 description: >
   A warm-canvas, high-energy Voice AI SaaS aesthetic inspired by SayBriefly.
   The design is built on a cream off-white base with a single electric-yellow
   primary accent that commands every CTA and interactive moment. Typography is
-  expressive at display scale (Syne, geometric 800-weight) and clinical at body
-  scale (Inter, 400-weight), creating a "brilliant but approachable" tension
+  expressive at display scale (Fraunces, Medium 500-weight) and clinical at body
+  scale (Geist, variable weight), creating a "brilliant but approachable" tension
   that suits an AI product where trust matters. Audio-wave motifs — SVG sine
   dividers, oscilloscope decorations — anchor the voice/audio brand identity.
   Elevation is deliberately flat: hierarchy is communicated through colour
@@ -32,51 +33,60 @@ colors:
 
 typography:
   display-lg:
-    fontFamily: Syne, sans-serif
+    fontFamily: Fraunces, serif
     fontSize: 72px
-    fontWeight: 800
+    fontWeight: 500
     lineHeight: 1.05
     letterSpacing: -0.03em
+    fontOpticalSizing: auto
+    fontStyle: normal
+    fontVariationSettings: '"SOFT" 0, "WONK" 0'
   display-md:
-    fontFamily: Syne, sans-serif
+    fontFamily: Fraunces, serif
     fontSize: 48px
-    fontWeight: 700
+    fontWeight: 500
     lineHeight: 1.1
     letterSpacing: -0.02em
+    fontOpticalSizing: auto
+    fontStyle: normal
+    fontVariationSettings: '"SOFT" 0, "WONK" 0'
   display-sm:
-    fontFamily: Syne, sans-serif
+    fontFamily: Fraunces, serif
     fontSize: 36px
-    fontWeight: 700
+    fontWeight: 500
     lineHeight: 1.15
     letterSpacing: -0.015em
+    fontOpticalSizing: auto
+    fontStyle: normal
+    fontVariationSettings: '"SOFT" 0, "WONK" 0'
   body-lg:
-    fontFamily: Inter, sans-serif
+    fontFamily: Geist, sans-serif
     fontSize: 18px
     fontWeight: 400
     lineHeight: 1.65
   body-md:
-    fontFamily: Inter, sans-serif
+    fontFamily: Geist, sans-serif
     fontSize: 16px
     fontWeight: 400
     lineHeight: 1.6
   body-sm:
-    fontFamily: Inter, sans-serif
+    fontFamily: Geist, sans-serif
     fontSize: 14px
     fontWeight: 400
     lineHeight: 1.55
   label-md:
-    fontFamily: Inter, sans-serif
+    fontFamily: Geist, sans-serif
     fontSize: 15px
     fontWeight: 600
     lineHeight: 1
     letterSpacing: 0.01em
   label-sm:
-    fontFamily: Inter, sans-serif
+    fontFamily: Geist, sans-serif
     fontSize: 13px
     fontWeight: 500
     lineHeight: 1.3
   caption:
-    fontFamily: Inter, sans-serif
+    fontFamily: Geist, sans-serif
     fontSize: 12px
     fontWeight: 500
     lineHeight: 1.4
@@ -180,7 +190,6 @@ components:
     textColor: "{colors.on-surface-variant}"
     height: 60px
     padding: 0px 32px
-
 ---
 
 ## Overview
@@ -189,7 +198,7 @@ Saral AI's visual identity is built on a single governing idea: **clarity as a c
 
 The palette is radically constrained: one loud electric-yellow accent (`primary`), one warm off-white canvas (`neutral`), one ink-black typographic anchor (`on-surface`). This restraint is not austerity — it is confidence. The yellow is the loudest thing on the page. Every CTA, every badge, every highlight competes for exactly the same attention. There is no visual noise.
 
-Syne headlines communicate "opinionated product." Their geometric irregularities at large sizes read as designed, not defaulted. Inter body text is invisible in the best way — the reader consumes information without noticing the font. This contrast between expressive display and invisible body is the typographic heartbeat of the system.
+Fraunces headlines communicate "opinionated product." Their clean, editorial structure at large sizes reads as premium and professional. Geist body text is invisible in the best way — the reader consumes information without noticing the font. This contrast between expressive display and clinical body is the typographic heartbeat of the system.
 
 Illustration does the warmth work that photography cannot reliably do. Hand-drawn ink line-art characters — diverse, expressive, posed naturally — appear in the hero, CTA bands, and footer. They signal "humans built this, for humans." This is a critical signal for Voice AI where the product must feel like an ally, not a replacement.
 
@@ -218,7 +227,7 @@ The palette has fourteen tokens across seven semantic roles. Coding agents must 
 
 ## Typography
 
-The type system uses two families: **Syne** for all display moments and **Inter** for all functional text. Syne must be loaded from Google Fonts (`wght@700;800`). Inter is available as a system font fallback on most platforms but should be loaded for weights 400, 500, and 600.
+The type system uses two families: **Fraunces** for all display moments and **Geist** for all functional text. Fraunces must be loaded from Google Fonts at weight 500. Geist is loaded as a variable font.
 
 Display tokens use `clamp()` for fluid sizing. In CSS, the agent should implement `display-lg` as `clamp(2.5rem, 5vw, 4.5rem)` and `display-md` as `clamp(1.875rem, 3.5vw, 3rem)`. The pixel values in the token schema represent the desktop maximum.
 
@@ -236,7 +245,7 @@ The hierarchy from most to least emphatic: `display-lg → display-md → displa
 
 **Section eyebrows** (the small label appearing above a section headline) use `caption` style with a `primary` yellow dot prefix: `● Feature Name`. This pattern must be consistent throughout.
 
-Syne must never appear below 24px. At smaller sizes its optical irregularities become illegible. Use `label-md` (Inter 600) as the fallback for any label that would otherwise require Syne at small size.
+Fraunces must never appear below 24px. At smaller sizes its serif details can become cluttered. Use `label-md` (Geist 600) as the fallback for any label that would otherwise require Fraunces at small size.
 
 ## Layout
 
@@ -263,11 +272,11 @@ page-padding-x:  spacing.margin (32px) ≥1024px / spacing.md (16px) <1024px
 
 Saral AI uses a **flat elevation model** with three levels. Heavy shadows are never used.
 
-| Level | Name | Context | Treatment |
-|-------|------|---------|-----------|
-| 0 | Flat | Section backgrounds, page canvas, nav | Background colour only. No border. No shadow. |
-| 1 | Card | Feature cards, FAQ rows, integration logos | `border: 1px solid {colors.outline}` + `box-shadow: 0 2px 8px rgba(26,26,26,0.06)` |
-| 2 | Float | Dropdown menus, tooltips, popovers | `box-shadow: 0 8px 24px rgba(26,26,26,0.12)`. No border required at this level. |
+| Level | Name  | Context                                    | Treatment                                                                          |
+| ----- | ----- | ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 0     | Flat  | Section backgrounds, page canvas, nav      | Background colour only. No border. No shadow.                                      |
+| 1     | Card  | Feature cards, FAQ rows, integration logos | `border: 1px solid {colors.outline}` + `box-shadow: 0 2px 8px rgba(26,26,26,0.06)` |
+| 2     | Float | Dropdown menus, tooltips, popovers         | `box-shadow: 0 8px 24px rgba(26,26,26,0.12)`. No border required at this level.    |
 
 The maximum `box-shadow` blur radius in the system is **24px**. Any shadow with blur greater than 24px is a violation. No gradient overlays. No glass-morphism. No `backdrop-filter` except on the sticky nav (see Components).
 
@@ -328,6 +337,7 @@ Full-width rows, no card wrapper — rows sit directly on the section background
 ## Do's and Don'ts
 
 **Do:**
+
 - Use `primary` yellow only on interactive elements and eyebrow labels — nowhere else.
 - Keep `display-lg` to one instance per page, always in the hero section.
 - Alternate section backgrounds between `neutral` and `surface-alt` for visual rhythm.
@@ -340,12 +350,13 @@ Full-width rows, no card wrapper — rows sit directly on the section background
 - Keep illustration style consistent: 2px ink strokes, flat fills, no gradients or photorealism.
 
 **Don't:**
+
 - Never use `box-shadow` with blur greater than 24px anywhere in the system.
 - Never place white text on `primary` yellow — contrast fails WCAG AA.
 - Never use `backdrop-filter` except on the sticky nav after scroll.
 - Never stack two `display-*` tokens without body copy between them.
 - Never introduce a colour outside the 14-token palette without updating this file.
-- Never use `Syne` below 24px — it becomes illegible.
+- Never use `Fraunces` below 24px — it becomes cluttered.
 - Never use more than one primary CTA button in a single viewport.
 - Never use `tertiary` mint or `secondary` orange for general decoration — they are named component contexts only.
 - Never use `display: none` to hide accordion content — animate height instead.

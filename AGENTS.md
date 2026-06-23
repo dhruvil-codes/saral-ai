@@ -13,7 +13,7 @@ Before writing any UI code, read `DESIGN.md` in full.
 Rules:
 
 1. Color: Reference only named tokens from DESIGN.md (e.g., `colors.primary`, `colors.neutral`). No arbitrary hex values.
-2. Typography: `display-*` tokens use Syne, all other tokens use Inter. Never use Syne below 24px.
+2. Typography: `display-*` tokens use Fraunces, all other tokens use Geist. Never use Fraunces below 24px.
 3. Buttons: Always pill-shaped (`rounded.full`). Primary CTA: yellow bg, dark text. One per viewport.
 4. Cards: `rounded.xl` (24px), `1px solid outline` border, `0 2px 8px` shadow max.
 5. Spacing: Follow `spacing.*` tokens. Section padding is `spacing.section` (96px desktop, 64px mobile).
