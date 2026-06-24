@@ -1,363 +1,1165 @@
----
-version: alpha
-reference of the Entire Design is from: https://saybriefly.com/
-name: Saral AI
-description: >
-  A warm-canvas, high-energy Voice AI SaaS aesthetic inspired by SayBriefly.
-  The design is built on a cream off-white base with a single electric-yellow
-  primary accent that commands every CTA and interactive moment. Typography is
-  expressive at display scale (Fraunces, Medium 500-weight) and clinical at body
-  scale (Geist, variable weight), creating a "brilliant but approachable" tension
-  that suits an AI product where trust matters. Audio-wave motifs — SVG sine
-  dividers, oscilloscope decorations — anchor the voice/audio brand identity.
-  Elevation is deliberately flat: hierarchy is communicated through colour
-  contrast and 1px borders, never deep shadows. Illustration is hand-drawn
-  line-art, warm and human, reinforcing the "real talk, real people, no bots"
-  brand promise.
+# Portal — Design System
 
-colors:
-  primary: "#F5D000"
-  primary-dark: "#C9A800"
-  on-primary: "#1A1A1A"
-  secondary: "#E8622A"
-  on-secondary: "#FFFFFF"
-  tertiary: "#D4EAC8"
-  on-tertiary: "#1A1A1A"
-  neutral: "#FAFAF5"
-  surface: "#FFFFFF"
-  surface-alt: "#F0F0E8"
-  on-surface: "#1A1A1A"
-  on-surface-variant: "#3D3D3D"
-  outline: "#E2E2D8"
-  muted: "#8A8A8A"
+## Reference Website: https://useportal.net/
 
-typography:
-  display-lg:
-    fontFamily: Fraunces, serif
-    fontSize: 72px
-    fontWeight: 500
-    lineHeight: 1.05
-    letterSpacing: -0.03em
-    fontOpticalSizing: auto
-    fontStyle: normal
-    fontVariationSettings: '"SOFT" 0, "WONK" 0'
-  display-md:
-    fontFamily: Fraunces, serif
-    fontSize: 48px
-    fontWeight: 500
-    lineHeight: 1.1
-    letterSpacing: -0.02em
-    fontOpticalSizing: auto
-    fontStyle: normal
-    fontVariationSettings: '"SOFT" 0, "WONK" 0'
-  display-sm:
-    fontFamily: Fraunces, serif
-    fontSize: 36px
-    fontWeight: 500
-    lineHeight: 1.15
-    letterSpacing: -0.015em
-    fontOpticalSizing: auto
-    fontStyle: normal
-    fontVariationSettings: '"SOFT" 0, "WONK" 0'
-  body-lg:
-    fontFamily: Geist, sans-serif
-    fontSize: 18px
-    fontWeight: 400
-    lineHeight: 1.65
-  body-md:
-    fontFamily: Geist, sans-serif
-    fontSize: 16px
-    fontWeight: 400
-    lineHeight: 1.6
-  body-sm:
-    fontFamily: Geist, sans-serif
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.55
-  label-md:
-    fontFamily: Geist, sans-serif
-    fontSize: 15px
-    fontWeight: 600
-    lineHeight: 1
-    letterSpacing: 0.01em
-  label-sm:
-    fontFamily: Geist, sans-serif
-    fontSize: 13px
-    fontWeight: 500
-    lineHeight: 1.3
-  caption:
-    fontFamily: Geist, sans-serif
-    fontSize: 12px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: 0.04em
+## 1. Brand Personality
 
-rounded:
-  none: 0px
-  xs: 4px
-  sm: 8px
-  md: 12px
-  lg: 16px
-  xl: 24px
-  2xl: 32px
-  full: 9999px
+Portal is a freelance toolkit (proposals → payments). The visual language is **clean, professional, slightly warm** — not a cold SaaS blue. It leans into lifestyle/craft photography, generous whitespace, and soft neutrals with a single orange/amber accent. The tone is confident and direct, no hype.
 
-spacing:
-  xs: 4px
-  sm: 8px
-  md: 16px
-  lg: 24px
-  xl: 32px
-  2xl: 48px
-  3xl: 64px
-  4xl: 80px
-  5xl: 96px
-  6xl: 128px
-  gutter: 24px
-  margin: 32px
-  section: 96px
-
-components:
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.full}"
-    padding: 12px 32px
-  button-primary-hover:
-    backgroundColor: "{colors.primary-dark}"
-    textColor: "{colors.on-primary}"
-  button-primary-active:
-    backgroundColor: "{colors.primary-dark}"
-    textColor: "{colors.on-primary}"
-  button-secondary:
-    backgroundColor: "transparent"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.full}"
-    padding: 12px 32px
-  button-secondary-hover:
-    backgroundColor: "rgba(26,26,26,0.06)"
-  button-ghost:
-    backgroundColor: "transparent"
-    textColor: "{colors.on-surface-variant}"
-    typography: "{typography.label-md}"
-    rounded: "{rounded.full}"
-    padding: 8px 16px
-  card:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    rounded: "{rounded.xl}"
-    padding: 32px
-  card-feature:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    rounded: "{rounded.xl}"
-    padding: 32px
-  card-highlight:
-    backgroundColor: "{colors.tertiary}"
-    textColor: "{colors.on-tertiary}"
-    rounded: "{rounded.xl}"
-    padding: 32px
-  card-cta:
-    backgroundColor: "{colors.secondary}"
-    textColor: "{colors.on-secondary}"
-    rounded: "{rounded.2xl}"
-    padding: 64px 48px
-  badge:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.full}"
-    padding: 4px 12px
-  badge-outline:
-    backgroundColor: "transparent"
-    textColor: "{colors.on-surface-variant}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.full}"
-    padding: 4px 12px
-  input:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: 12px 16px
-  input-focus:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.on-surface}"
-  nav:
-    backgroundColor: "{colors.neutral}"
-    textColor: "{colors.on-surface-variant}"
-    height: 60px
-    padding: 0px 32px
 ---
 
-## Overview
+## 2. Color Tokens
 
-Saral AI's visual identity is built on a single governing idea: **clarity as a competitive advantage**. Voice AI products operate in a trust deficit — users worry about bots replacing real communication, about recordings, about automation erasing the human moment. Every design decision is made to dismantle that anxiety.
+```css
+/* --- Core Palette --- */
+--color-bg: #f5f5f0; /* warm off-white — page background */
+--color-surface: #ffffff; /* cards, modals, nav */
+--color-surface-alt: #f0f0ea; /* subtle section tint */
 
-The palette is radically constrained: one loud electric-yellow accent (`primary`), one warm off-white canvas (`neutral`), one ink-black typographic anchor (`on-surface`). This restraint is not austerity — it is confidence. The yellow is the loudest thing on the page. Every CTA, every badge, every highlight competes for exactly the same attention. There is no visual noise.
+/* --- Text --- */
+--color-text-primary: #1a1a1a; /* headings, body */
+--color-text-secondary: #555555; /* subtext, captions */
+--color-text-muted: #888888; /* meta, placeholders */
 
-Fraunces headlines communicate "opinionated product." Their clean, editorial structure at large sizes reads as premium and professional. Geist body text is invisible in the best way — the reader consumes information without noticing the font. This contrast between expressive display and clinical body is the typographic heartbeat of the system.
+/* --- Accent (primary CTA + icon fills) --- */
+--color-accent: #f5a623; /* amber/orange */
+--color-accent-hover: #e09510;
+--color-accent-light: #fef3dc; /* tinted backgrounds behind icons */
 
-Illustration does the warmth work that photography cannot reliably do. Hand-drawn ink line-art characters — diverse, expressive, posed naturally — appear in the hero, CTA bands, and footer. They signal "humans built this, for humans." This is a critical signal for Voice AI where the product must feel like an ally, not a replacement.
+/* --- Feature icon circles --- */
+--color-icon-blue: #3b82f6;
+--color-icon-green: #22c55e;
+--color-icon-purple: #a855f7;
+--color-icon-orange: #f97316;
 
-Audio-wave motifs (SVG sine dividers between sections, oscilloscope decorations in the hero) reinforce the voice/audio brand without being literal. They are decorative, not explanatory.
+/* --- Border & Dividers --- */
+--color-border: #e5e5e0;
+--color-border-strong: #cccccc;
 
-The product is for ambitious people who are already overwhelmed. The design gets out of their way.
-
-## Colors
-
-The palette has fourteen tokens across seven semantic roles. Coding agents must not introduce colours outside this set without explicit instruction.
-
-- **Primary (`#F5D000`):** Electric yellow — the single brand accent. Used exclusively for primary CTAs, badge fills, interactive highlights, and the section eyebrow dot. Never placed on a white background without the `on-primary` (#1A1A1A) text pairing — this yellow fails WCAG AA against white at this luminosity.
-- **Primary-dark (`#C9A800`):** The hover and pressed state for primary buttons. Applied only via `:hover` and `:active` states on primary button components.
-- **On-primary (`#1A1A1A`):** Dark ink text rendered on top of any primary yellow surface.
-- **Secondary (`#E8622A`):** Warm orange — used exclusively for CTA band section backgrounds. Never used for buttons or text decoration. One CTA band per page maximum.
-- **On-secondary (`#FFFFFF`):** White text and headlines rendered on secondary orange surfaces.
-- **Tertiary (`#D4EAC8`):** Soft mint green — used exclusively for testimonial card backgrounds and feature highlight cards. Provides warmth without adding a new hue energy.
-- **On-tertiary (`#1A1A1A`):** Dark ink text rendered on tertiary mint surfaces.
-- **Neutral (`#FAFAF5`):** The global page background — warm off-white with a barely perceptible yellow undertone that harmonises with primary. All sections that are not `surface-alt`, `secondary`, or `tertiary` use this.
-- **Surface (`#FFFFFF`):** Card and modal backgrounds. The 5-point lightness step above `neutral` creates lift without a shadow.
-- **Surface-alt (`#F0F0E8`):** Alternate section band. Sections toggle: `neutral → surface-alt → neutral`. Never use `surface-alt` inside a card.
-- **On-surface (`#1A1A1A`):** Near-black for all headlines and high-emphasis text on light backgrounds. Not pure black — the warmth prevents harshness on the cream canvas.
-- **On-surface-variant (`#3D3D3D`):** Mid-dark for body copy, secondary labels, nav links. Greater than 7:1 contrast on `neutral`.
-- **Outline (`#E2E2D8`):** 1px card borders, section dividers, accordion separators. Never use a shadow where a border communicates the same thing.
-- **Muted (`#8A8A8A`):** Captions, placeholder text, icon fills. Never use for body copy.
-
-## Typography
-
-The type system uses two families: **Fraunces** for all display moments and **Geist** for all functional text. Fraunces must be loaded from Google Fonts at weight 500. Geist is loaded as a variable font.
-
-Display tokens use `clamp()` for fluid sizing. In CSS, the agent should implement `display-lg` as `clamp(2.5rem, 5vw, 4.5rem)` and `display-md` as `clamp(1.875rem, 3.5vw, 3rem)`. The pixel values in the token schema represent the desktop maximum.
-
-The hierarchy from most to least emphatic: `display-lg → display-md → display-sm → body-lg → body-md → label-md → body-sm → label-sm → caption`.
-
-- **display-lg:** Hero page headline only. One per page. Never repeated.
-- **display-md:** Section headlines. One per visible section. Always paired with a sub-copy block using `body-lg`.
-- **display-sm:** Card headlines, modal titles, feature labels above the fold.
-- **body-lg:** Hero sub-copy directly below `display-lg`, and testimonial quote text.
-- **body-md:** All paragraph text, FAQ answers, feature descriptions. Line-length constrained to 65ch maximum.
-- **label-md:** All button labels, nav links, tab labels. Never all-caps.
-- **body-sm:** Meta text, dates, secondary labels, attribution lines.
-- **label-sm:** Form labels, tooltip text, annotation text.
-- **caption:** Badge text, eyebrow labels above headlines, integration strip labels. Always uppercase via CSS `text-transform: uppercase`. Letter spacing 0.04em is required at this size.
-
-**Section eyebrows** (the small label appearing above a section headline) use `caption` style with a `primary` yellow dot prefix: `● Feature Name`. This pattern must be consistent throughout.
-
-Fraunces must never appear below 24px. At smaller sizes its serif details can become cluttered. Use `label-md` (Geist 600) as the fallback for any label that would otherwise require Fraunces at small size.
-
-## Layout
-
-The layout engine is a **12-column fluid grid** with a maximum content width of 1160px, centred with `margin: auto`, and horizontal page padding of `spacing.margin` (32px) at desktop, `spacing.md` (16px) at mobile.
-
-```
-max-width:       1160px
-columns:         12
-gutter:          spacing.gutter (24px) desktop / spacing.sm (8px) mobile
-page-padding-x:  spacing.margin (32px) ≥1024px / spacing.md (16px) <1024px
+/* --- Dark section (footer CTA) --- */
+--color-dark-bg: #0f0f0f;
+--color-dark-text: #ffffff;
 ```
 
-**Section rhythm** — Vertical section padding follows a consistent beat of `spacing.section` (96px) top and bottom at desktop. At mobile, reduce to `spacing.3xl` (64px). Inside each section, the headline-to-sub-copy gap is `spacing.lg` (24px). The sub-copy-to-CTA gap is `spacing.xl` (32px).
+---
 
-**Feature grids** — Two-column at desktop (≥1024px), one-column at mobile. Column gap `spacing.gutter` (24px). Never use three columns for feature cards — readability suffers on mid-range tablets.
+## 3. Typography
 
-**Integration strip** — A horizontal flex row of partner logos at 40–48px height, centred, with `spacing.lg` (24px) gap between items. Wrap in `overflow-x: auto; scrollbar-width: none` for mobile overflow.
+### Typefaces
 
-**Wave dividers** — SVG sine path dividers 48–80px tall separate major sections. The fill is always the incoming section's background colour. Implement as `<div aria-hidden="true">` wrapping inline `<svg viewBox="0 0 1440 60" preserveAspectRatio="none">`. Never use `<img>`. Maximum three wave dividers per page.
+| Role                | Family                                    | Source       |
+| ------------------- | ----------------------------------------- | ------------ |
+| Display / Headlines | **ITC Garamond Book Narrow**               | Local Font (`/fonts/ITC Garamond Book Narrow Regular.otf`) |
+| Body / UI           | **Inter**                                 | Google Fonts |
+| Mono (code/labels)  | **JetBrains Mono**                        | Google Fonts |
 
-**Content max-width exceptions** — CTA bands and testimonial sections are full-bleed (background colour edge-to-edge), with inner content constrained to 720px max-width, centred.
+```html
+<!-- Local Font configuration in Next.js layout / stylesheet -->
+<!-- public/fonts/ITC Garamond Book Narrow Regular.otf -->
+```
 
-## Elevation & Depth
+### Type Scale
 
-Saral AI uses a **flat elevation model** with three levels. Heavy shadows are never used.
+```css
+/* --- Display --- */
+--text-display-xl: clamp(2.75rem, 6vw, 4.5rem); /* hero H1 */
+--text-display-lg: clamp(2rem, 4vw, 3rem); /* section H2 */
+--text-display-md: clamp(1.5rem, 3vw, 2.25rem); /* sub-section H3 */
 
-| Level | Name  | Context                                    | Treatment                                                                          |
-| ----- | ----- | ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| 0     | Flat  | Section backgrounds, page canvas, nav      | Background colour only. No border. No shadow.                                      |
-| 1     | Card  | Feature cards, FAQ rows, integration logos | `border: 1px solid {colors.outline}` + `box-shadow: 0 2px 8px rgba(26,26,26,0.06)` |
-| 2     | Float | Dropdown menus, tooltips, popovers         | `box-shadow: 0 8px 24px rgba(26,26,26,0.12)`. No border required at this level.    |
+/* --- Body --- */
+--text-body-lg: 1.125rem; /* lead paragraph */
+--text-body-md: 1rem; /* default body */
+--text-body-sm: 0.875rem; /* captions, meta */
+--text-body-xs: 0.75rem; /* labels, badges */
 
-The maximum `box-shadow` blur radius in the system is **24px**. Any shadow with blur greater than 24px is a violation. No gradient overlays. No glass-morphism. No `backdrop-filter` except on the sticky nav (see Components).
+/* --- Line Heights --- */
+--lh-display: 1.1;
+--lh-body: 1.65;
+--lh-ui: 1.4;
 
-If you are tempted to add a dramatic drop shadow, use a `1px outline border` instead.
+/* --- Letter Spacing --- */
+--ls-tight: -0.02em; /* large headings */
+--ls-normal: 0;
+--ls-wide: 0.05em; /* all-caps labels */
+```
 
-## Shapes
+### Type Styles (semantic classes)
 
-The shape language is **rounded-friendly but not bubbly**. Pill shapes (`rounded.full`) are reserved for buttons and badges only — they signal "interactive" and must not appear on cards or containers. Cards and panels use `rounded.xl` (24px). Inputs and small chips use `rounded.md` (12px). Sharp corners (`rounded.none`) are used only for full-bleed wave dividers and images that extend to a card edge.
+```css
+.t-hero {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: var(--text-display-xl);
+  font-weight: 700;
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-tight);
+  color: var(--color-text-primary);
+}
 
-The system never mixes pill-shaped and sharp-cornered elements within the same component grouping. If a card contains a button, the button is pill-shaped and the card is `rounded.xl`. The contrast in radius reinforces the hierarchy between container and interactive element.
+.t-section-heading {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: var(--text-display-lg);
+  font-weight: 700;
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-tight);
+}
 
-## Components
+.t-subheading {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-display-md);
+  font-weight: 600;
+  line-height: 1.3;
+}
 
-### Button — Primary
 
-Pill-shaped (`rounded.full`), `primary` yellow background, `on-primary` dark text, `label-md` typography. Padding `12px 32px`. No shadow, no border. On hover: background transitions to `primary-dark` in 150ms ease. On active/press: `transform: scale(0.97)` for physical feedback. Minimum touch target 44×44px — the default padding achieves this. Never place a primary button on a `primary` yellow background — switch to `button-secondary` in that context.
+.t-body-lead {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-lg);
+  font-weight: 400;
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
 
-### Button — Secondary
+.t-body {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
 
-Identical geometry and padding to primary. `transparent` background, `1.5px solid {colors.on-surface}` border, `on-surface` text. On hover: background becomes `rgba(26,26,26,0.06)`. Used when two actions of near-equal weight appear side by side, or on `secondary` (orange) CTA band backgrounds.
+.t-label {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+}
 
-### Button — Ghost
+.t-nav {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+}
+```
 
-No border, no background. `on-surface-variant` text, `label-md` typography, `rounded.full`. Padding `8px 16px`. Used for tertiary actions, nav items that need a button affordance, and "learn more" inline links.
+---
 
-### Card
+## 4. Spacing Scale
 
-`surface` white background, `1px solid {colors.outline}` border, `rounded.xl` (24px), `32px` internal padding on all sides, `box-shadow: 0 2px 8px rgba(26,26,26,0.06)`. Content inside cards uses `display-sm` for the card headline, `body-md` for description, and optionally a `badge-outline` tag at the top. Feature variant cards add `border-left: 4px solid {colors.primary}` as a yellow left stripe — this is the only border decoration in the system.
+Based on a 4px base unit.
 
-### Card — Highlight
+```css
+--space-1: 4px;
+--space-2: 8px;
+--space-3: 12px;
+--space-4: 16px;
+--space-5: 20px;
+--space-6: 24px;
+--space-8: 32px;
+--space-10: 40px;
+--space-12: 48px;
+--space-16: 64px;
+--space-20: 80px;
+--space-24: 96px;
+--space-32: 128px;
 
-`tertiary` mint background, no border, no shadow, `rounded.xl`, `32px` padding. Used for feature pull-outs, testimonial-adjacent quotes, and product benefit callouts. Text uses `on-tertiary` (`#1A1A1A`).
+/* Section vertical rhythm */
+--section-padding-y: clamp(64px, 10vw, 120px);
+```
 
-### Card — CTA Band
+---
 
-Full-bleed `secondary` orange background, `rounded.2xl` (32px) when used as an island card or 0px when used as a full-width section. Inner content max-width 720px, centred. Headline in `display-md`, `on-secondary` white. Sub-copy in `body-lg`, `rgba(255,255,255,0.8)`. One `button-primary` CTA. Paired with a hand-drawn illustration to the right at desktop (hidden at mobile).
+## 5. Layout & Grid
 
-### Badge
+```css
+/* Container */
+--container-max: 1120px;
+--container-gutter: clamp(16px, 5vw, 48px);
 
-Filled variant: `primary` yellow fill, `on-primary` dark text, `caption` typography (uppercase), `rounded.full`, `4px 12px` padding. Outline variant: `transparent` background, `1px solid {colors.outline}` border, `on-surface-variant` text. Badges appear above section headlines as eyebrows, on feature card tops as category labels, and in the nav for "New" or "Beta" markers. Maximum one badge per card.
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-gutter);
+}
 
-### Navigation
+/* Grid systems used on the page */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-8);
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+}
+.grid-feature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-16);
+  align-items: center;
+}
 
-`neutral` background, `1px solid {colors.outline}` bottom border, `60px` height, sticky at `z-index: 100`. Logo left-aligned. Nav links centred or right-aligned using `label-md` style in `on-surface-variant`. One `button-primary` in the top-right corner. On scroll past 60px: `background: rgba(250,250,245,0.92)` + `backdrop-filter: blur(8px)`. This is the **only place** `backdrop-filter` is used in the system.
+/* Feature rows alternate image left / image right */
+.grid-feature:nth-child(even) {
+  direction: rtl;
+}
+.grid-feature:nth-child(even) > * {
+  direction: ltr;
+}
 
-### Input Field
+@media (max-width: 768px) {
+  .grid-2,
+  .grid-3,
+  .grid-feature {
+    grid-template-columns: 1fr;
+  }
+}
+```
 
-`surface` white background, `1.5px solid {colors.outline}` border, `rounded.md` (12px), `12px 16px` padding, `body-md` text. Focus ring: `outline: 2px solid {colors.primary}` with `outline-offset: 2px`. Error state: border and outline change to `#D32F2F`. Placeholder text uses `muted` colour. Field label above the input uses `label-sm` at `on-surface-variant`.
+---
 
-### Accordion / FAQ
+## 6. Border Radius
 
-Full-width rows, no card wrapper — rows sit directly on the section background. `border-top: 1px solid {colors.outline}` separates each row. Trigger uses `body-md` at fontWeight 500, `on-surface` colour, with a `+` / `−` icon right-aligned. Content area uses `body-md` `on-surface-variant` with `16px` top padding. Height animates with `transition: height 200ms ease` — never toggle with `display: none`.
+```css
+--radius-sm: 4px; /* tags, badges */
+--radius-md: 8px; /* inputs, small cards */
+--radius-lg: 12px; /* cards */
+--radius-xl: 20px; /* large panels, feature boxes */
+--radius-2xl: 28px; /* hero browser mockup */
+--radius-full: 9999px; /* pills, icon circles */
+```
 
-### Testimonial Card
+---
 
-`tertiary` mint background, `rounded.xl`, `40px 32px` padding. A decorative `"` quotation mark in `primary` yellow at `font-size: 5rem`, `aria-hidden="true"`, anchors the top-left. Quote text in `body-lg` italic, `on-tertiary`. Attribution line in `body-sm`, `muted`. No avatar — text-only layout only.
+## 7. Shadows & Elevation
 
-## Do's and Don'ts
+```css
+--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05);
+--shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+--shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+--shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.12); /* hero browser mockup */
 
-**Do:**
+/* Floating card used in feature sections */
+--shadow-card: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.05);
+```
 
-- Use `primary` yellow only on interactive elements and eyebrow labels — nowhere else.
-- Keep `display-lg` to one instance per page, always in the hero section.
-- Alternate section backgrounds between `neutral` and `surface-alt` for visual rhythm.
-- Use `rounded.full` exclusively for buttons and badges — no cards, no containers.
-- Set body copy containers to `max-width: 65ch` for optimal line length.
-- Pair every `display-md` section headline with `body-lg` sub-copy directly below it.
-- Use the eyebrow pattern (`caption` + yellow dot + label) consistently before every section headline.
-- Implement wave dividers as inline `<svg>` elements so the fill can be controlled with CSS variables.
-- Ensure every interactive element meets a 44×44px minimum touch target.
-- Keep illustration style consistent: 2px ink strokes, flat fills, no gradients or photorealism.
+---
 
-**Don't:**
+## 8. Components
 
-- Never use `box-shadow` with blur greater than 24px anywhere in the system.
-- Never place white text on `primary` yellow — contrast fails WCAG AA.
-- Never use `backdrop-filter` except on the sticky nav after scroll.
-- Never stack two `display-*` tokens without body copy between them.
-- Never introduce a colour outside the 14-token palette without updating this file.
-- Never use `Fraunces` below 24px — it becomes cluttered.
-- Never use more than one primary CTA button in a single viewport.
-- Never use `tertiary` mint or `secondary` orange for general decoration — they are named component contexts only.
-- Never use `display: none` to hide accordion content — animate height instead.
-- Never use photography for product illustration — hand-drawn line-art only.
+### 8.1 Navigation
+
+```
+┌────────────────────────────────────────────────────────┐
+│  [Logo]              Product   Blog   Contact   [CTA]  │
+└────────────────────────────────────────────────────────┘
+```
+
+```css
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(245, 245, 240, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  list-style: none;
+}
+
+.nav-links a {
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-links a:hover {
+  color: var(--color-text-primary);
+}
+```
+
+---
+
+### 8.2 Buttons
+
+```css
+/* Base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    transform 0.1s,
+    box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+/* Primary — amber fill */
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  padding: var(--space-3) var(--space-6);
+  box-shadow: 0 2px 8px rgba(245, 166, 35, 0.35);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 4px 16px rgba(245, 166, 35, 0.4);
+}
+
+/* Secondary — outline */
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1.5px solid var(--color-border-strong);
+  padding: var(--space-3) var(--space-6);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+/* Ghost / text link */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-4);
+}
+
+.btn-ghost:hover {
+  color: var(--color-text-primary);
+}
+
+/* Sizes */
+.btn-sm {
+  font-size: var(--text-body-xs);
+  padding: var(--space-2) var(--space-4);
+}
+.btn-lg {
+  font-size: var(--text-body-md);
+  padding: var(--space-4) var(--space-8);
+}
+```
+
+---
+
+### 8.3 Hero Section
+
+```
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│          Your beautiful freelance toolkit.           │  ← .t-hero, centered
+│       From sending proposals to getting paid.        │
+│                                                      │
+│     [short descriptor paragraph, .t-body-lead]       │
+│                                                      │
+│              [ Get started — btn-primary ]           │
+│                                                      │
+│   ┌─────────────────────────────────────────────┐   │
+│   │   [Browser chrome mockup / product screenshot]│   │
+│   └─────────────────────────────────────────────┘   │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+```css
+.hero {
+  text-align: center;
+  padding-top: var(--space-24);
+  padding-bottom: 0;
+}
+
+.hero-headline {
+  max-width: 700px;
+  margin-inline: auto;
+}
+
+.hero-body {
+  max-width: 520px;
+  margin-inline: auto;
+  margin-top: var(--space-6);
+  color: var(--color-text-secondary);
+}
+
+.hero-cta {
+  margin-top: var(--space-8);
+}
+
+/* Browser mockup wrapper */
+.hero-mockup {
+  margin-top: var(--space-12);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  /* subtle gradient fade at bottom */
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+.hero-mockup img {
+  width: 100%;
+  display: block;
+}
+```
+
+**Background treatment (hero):** Full-width gradient image (landscape photo — dusk mountains/sky in purple/orange tones) sits behind the hero area, fading into the page background color. Implemented as:
+
+```css
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("/hero-bg.jpg");
+  background-size: cover;
+  background-position: center top;
+  opacity: 0.18; /* very subtle */
+  z-index: -1;
+}
+```
+
+---
+
+### 8.4 Feature Checklist (2-col icon list)
+
+Used in the "Your projects deserve…" section.
+
+```
+  ✓ [Icon]  Feature one          ✓ [Icon]  Feature two
+  ✓ [Icon]  Feature three        ✓ [Icon]  Feature four
+```
+
+```css
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4) var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.feature-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* Icon circle */
+.feature-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.feature-icon.blue {
+  background: #eff6ff;
+  color: var(--color-icon-blue);
+}
+.feature-icon.green {
+  background: #f0fdf4;
+  color: var(--color-icon-green);
+}
+.feature-icon.purple {
+  background: #faf5ff;
+  color: var(--color-icon-purple);
+}
+.feature-icon.orange {
+  background: #fff7ed;
+  color: var(--color-icon-orange);
+}
+```
+
+---
+
+### 8.5 Feature Row (alternating text + UI screenshot)
+
+```
+Text side                      │   Screenshot/mockup side
+───────────────────────────────┼──────────────────────────
+[Eyebrow label]                │   ┌──────────────────┐
+Big section heading            │   │  Product UI shot  │
+                               │   │  (floating card)  │
+Body paragraph describing      │   └──────────────────┘
+the feature in plain terms.    │
+```
+
+```css
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-16);
+  align-items: center;
+  padding: var(--space-20) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Alternate layout every other row */
+.feature-row:nth-child(even) .feature-row-visual {
+  order: -1;
+}
+
+.feature-row-eyebrow {
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--color-accent);
+  margin-bottom: var(--space-3);
+}
+
+.feature-row-heading {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: var(--ls-tight);
+  margin-bottom: var(--space-5);
+}
+
+.feature-row-body {
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+
+/* Visual / mockup */
+.feature-row-visual {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.feature-row-visual img {
+  width: 100%;
+  display: block;
+}
+```
+
+---
+
+### 8.6 Icon Card (3-column feature grid)
+
+Used in the "Stop chasing clients" section with coloured emoji-style icons.
+
+```
+┌─────────────────┐
+│  🟠             │  ← colored circle icon, 40px
+│  Card heading   │
+│  Short body     │
+│  text here.     │
+└─────────────────┘
+```
+
+```css
+.icon-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.icon-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.icon-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: var(--space-2);
+}
+
+.icon-card-title {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.icon-card-body {
+  font-size: var(--text-body-sm);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+```
+
+---
+
+### 8.7 Steps / Process List
+
+Used in "Go from proposal to getting paid. Here's how."
+
+```
+  ① Select project type        ← numbered badge (filled circle)
+    One-line description.
+
+  ② Send link to client
+    ...
+```
+
+```css
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+}
+
+.step-item {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-body-xs);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-content-title {
+  font-size: var(--text-body-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.step-content-body {
+  font-size: var(--text-body-sm);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+```
+
+---
+
+### 8.8 Pricing Card
+
+```
+┌─────────────────────────────────┐
+│  Plan name          $XX/mo      │
+│  ─────────────────────────────  │
+│  ✓ Feature one                  │
+│  ✓ Feature two                  │
+│  ✓ Feature three                │
+│                                 │
+│        [ Get started ]          │
+└─────────────────────────────────┘
+```
+
+```css
+.pricing-card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pricing-card.featured {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 4px var(--color-accent-light),
+    var(--shadow-md);
+}
+
+.pricing-plan-name {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--color-text-secondary);
+}
+
+.pricing-price {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: var(--ls-tight);
+  color: var(--color-text-primary);
+}
+
+.pricing-price span {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.pricing-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.pricing-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pricing-features li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.pricing-features li::before {
+  content: "✓";
+  color: var(--color-icon-green);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+```
+
+---
+
+### 8.9 Testimonial Card
+
+```css
+.testimonial-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.testimonial-quote {
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-primary);
+}
+
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.testimonial-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.testimonial-name {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.testimonial-handle {
+  font-size: var(--text-body-xs);
+  color: var(--color-text-muted);
+}
+```
+
+---
+
+### 8.10 Badge / Tag
+
+```css
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.badge-accent {
+  background: var(--color-accent-light);
+  border-color: transparent;
+  color: #92400e;
+}
+
+.badge-green {
+  background: #f0fdf4;
+  border-color: transparent;
+  color: #166534;
+}
+```
+
+---
+
+### 8.11 Section Divider / Eyebrow
+
+```css
+/* Section eyebrow — small label above big headings */
+.eyebrow {
+  display: inline-block;
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+/* Centered section intro block */
+.section-intro {
+  text-align: center;
+  max-width: 600px;
+  margin-inline: auto;
+  margin-bottom: var(--space-16);
+}
+```
+
+---
+
+### 8.12 Footer
+
+```
+┌──────────────────────────────────────────────────────┐
+│  [Logo]   [Nav links ...............]  [Social icons] │
+│  ─────────────────────────────────────────────────── │
+│  © 2024 Portal  ·  Privacy  ·  Terms                 │
+└──────────────────────────────────────────────────────┘
+```
+
+```css
+.footer {
+  background: var(--color-dark-bg);
+  color: var(--color-dark-text);
+  padding: var(--space-16) 0 var(--space-8);
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-12);
+}
+
+.footer-nav {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.footer-nav a {
+  font-size: var(--text-body-sm);
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-nav a:hover {
+  color: #fff;
+}
+
+.footer-bottom {
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-body-xs);
+  color: rgba(255, 255, 255, 0.4);
+}
+```
+
+---
+
+### 8.13 CTA Banner (dark full-width)
+
+Bottom of page: dark background, centered headline, single CTA.
+
+```css
+.cta-banner {
+  background: var(--color-dark-bg);
+  color: var(--color-dark-text);
+  text-align: center;
+  padding: var(--space-24) var(--space-8);
+  border-radius: var(--radius-2xl);
+  margin: var(--space-20) 0;
+}
+
+.cta-banner .t-section-heading {
+  color: #fff;
+}
+
+.cta-banner .t-body-lead {
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 480px;
+  margin-inline: auto;
+  margin-top: var(--space-4);
+}
+
+.cta-banner .btn-primary {
+  margin-top: var(--space-8);
+}
+```
+
+---
+
+## 9. Motion & Animation
+
+```css
+/* Reduced motion override — always include */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scroll-reveal base state */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Staggered children */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.reveal-stagger.visible > *:nth-child(1) {
+  transition-delay: 0ms;
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger.visible > *:nth-child(2) {
+  transition-delay: 80ms;
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger.visible > *:nth-child(3) {
+  transition-delay: 160ms;
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger.visible > *:nth-child(4) {
+  transition-delay: 240ms;
+  opacity: 1;
+  transform: none;
+}
+
+/* Hover lift for cards */
+.hover-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+```
+
+```js
+// Intersection observer for .reveal elements
+const observer = new IntersectionObserver(
+  (entries) =>
+    entries.forEach(
+      (e) => e.isIntersecting && e.target.classList.add("visible"),
+    ),
+  { threshold: 0.1, rootMargin: "0px 0px -40px 0px" },
+);
+
+document
+  .querySelectorAll(".reveal, .reveal-stagger")
+  .forEach((el) => observer.observe(el));
+```
+
+---
+
+## 10. Page Section Map
+
+| #   | Section                   | Layout pattern                                      |
+| --- | ------------------------- | --------------------------------------------------- |
+| 1   | Nav                       | Sticky, backdrop-blur                               |
+| 2   | Hero                      | Centered text + browser mockup below, dusk BG image |
+| 3   | Feature intro             | Centered headline + 2×3 icon checklist              |
+| 4   | Value prop copy block     | Centered headline, 2-col body                       |
+| 5   | Feature rows ×4           | Alternating text-left / image-right                 |
+| 6   | Pain → solution           | Centered headline + 3-col icon cards                |
+| 7   | Showcase / portal gallery | Full-bleed horizontal card scroll                   |
+| 8   | How it works              | Centered headline + numbered steps list             |
+| 9   | Pricing                   | Centered headline + 2–3 col pricing cards           |
+| 10  | Testimonials              | 2-col testimonial cards                             |
+| 11  | CTA banner                | Dark full-width, centered                           |
+| 12  | Footer                    | Dark bg, 3-col nav                                  |
+
+---
+
+## 11. CSS Custom Properties — Full Master Token File
+
+```css
+/* portal-tokens.css — import this first */
+:root {
+  /* Color */
+  --color-bg: #f5f5f0;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f0f0ea;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+  --color-accent: #f5a623;
+  --color-accent-hover: #e09510;
+  --color-accent-light: #fef3dc;
+  --color-icon-blue: #3b82f6;
+  --color-icon-green: #22c55e;
+  --color-icon-purple: #a855f7;
+  --color-icon-orange: #f97316;
+  --color-border: #e5e5e0;
+  --color-border-strong: #cccccc;
+  --color-dark-bg: #0f0f0f;
+  --color-dark-text: #ffffff;
+
+  /* Type scale */
+  --text-display-xl: clamp(2.75rem, 6vw, 4.5rem);
+  --text-display-lg: clamp(2rem, 4vw, 3rem);
+  --text-display-md: clamp(1.5rem, 3vw, 2.25rem);
+  --text-body-lg: 1.125rem;
+  --text-body-md: 1rem;
+  --text-body-sm: 0.875rem;
+  --text-body-xs: 0.75rem;
+
+  /* Line heights */
+  --lh-display: 1.1;
+  --lh-body: 1.65;
+  --lh-ui: 1.4;
+
+  /* Letter spacing */
+  --ls-tight: -0.02em;
+  --ls-normal: 0;
+  --ls-wide: 0.05em;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+  --section-padding-y: clamp(64px, 10vw, 120px);
+
+  /* Layout */
+  --container-max: 1120px;
+  --container-gutter: clamp(16px, 5vw, 48px);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+```
+
+---
+
+_End of Portal design system · generated June 2026_
