@@ -1,137 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import ScrollObserver from "../components/ScrollObserver";
+import Navbar from "../components/shadcn-space/blocks/navbar-01/navbar";
+import BentoGrid from "../components/kokonutui/bento-grid";
+import ScrollStack, { ScrollStackItem } from "./ScrollStack";
 import {
-  MissedCallsIllustration,
-  CostIllustration,
-  LanguageIllustration,
   StepCallIllustration,
   StepAnswerIllustration,
   StepSummaryIllustration,
 } from "../components/LineArt";
 
 export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [inHero, setInHero] = useState(true);
-  const navItems = ['Products', 'Services', 'Apps', 'Pricing', 'About'];
-
-  useEffect(() => {
-    const hero = document.getElementById("hero-section");
-    if (!hero) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setInHero(entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-      }
-    );
-
-    observer.observe(hero);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased select-none font-sans overflow-x-hidden">
       {/* Client-side scroll observer & metrics count-up triggers */}
       <ScrollObserver />
 
-      {/* 1. Navigation Header (Sticky, transition triggers on scroll) */}
-      <motion.header 
-        id="main-nav" 
-        className="fixed top-0 z-50 py-4 w-full"
-        initial={{ y: 0, opacity: 1 }}
-        animate={{ 
-          y: inHero ? 0 : -100, 
-          opacity: inHero ? 1 : 0 
-        }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        style={{ pointerEvents: inHero ? "auto" : "none" }}
-      >
-        <div className="max-w-[1160px] mx-auto px-4 md:px-8 flex items-center justify-between relative">
-          <a href="#" className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight !text-white hover:opacity-90 transition-opacity">
-            <svg width="26" height="36" viewBox="0 0 26 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="!text-white">
-              <path d="m7.25 10.86 6 3.366 6-3.367m-12 20.176v-6.721l-6-3.367m24 0-6 3.367v6.72M1.61 14.42l11.64 6.54 11.64-6.54M13.25 34V20.947m12 5.18v-10.36c0-.454-.124-.9-.358-1.293a2.63 2.63 0 0 0-.975-.947l-9.333-5.18a2.73 2.73 0 0 0-2.667 0l-9.333 5.18a2.63 2.63 0 0 0-.976.947 2.54 2.54 0 0 0-.358 1.293v10.36c0 .454.124.9.358 1.293s.57.72.976.947l9.333 5.18a2.73 2.73 0 0 0 2.667 0l9.333-5.18a2.63 2.63 0 0 0 .975-.947 2.53 2.53 0 0 0 .358-1.293" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Saral AI</span>
-          </a>
-
-          <div className="hidden md:flex items-center bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-full px-1 py-1 gap-2">
-            {navItems.map((item) => (
-              <a 
-                key={item} 
-                href="#" 
-                className={`px-4 py-1.5 rounded-full text-sm transition-colors ${
-                  item === 'Products' 
-                    ? 'bg-[var(--color-surface)] border border-[var(--color-border)] font-medium text-[var(--color-text-primary)]' 
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                }`}
-              >
-                {item}
-              </a>
-            ))}
-          </div>
-
-          <button className="hidden md:flex items-center gap-2.5 bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] hover:opacity-90 text-sm font-medium pl-5 pr-2 py-2 rounded-full cursor-pointer border-0 transition-all active:scale-98">
-            Get started
-            <span className="size-7 rounded-full bg-[var(--color-surface)] flex items-center justify-center">
-              <svg width="12" height="10" viewBox="0 0 12 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M.6 4.602h10m-4-4 4 4-4 4" stroke="var(--color-text-primary)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-          </button>
-
-          <button 
-            onClick={() => setMenuOpen(!menuOpen)} 
-            className="md:hidden flex flex-col gap-1.5 cursor-pointer bg-transparent border-0 p-1 z-50"
-          >
-            <span className={`block w-6 h-0.5 transition-transform duration-300 ${
-              menuOpen 
-                ? 'rotate-45 translate-y-2 bg-[var(--color-text-primary)]' 
-                : 'bg-white'
-            }`}></span>
-            <span className={`block w-6 h-0.5 transition-opacity duration-300 ${
-              menuOpen 
-                ? 'opacity-0' 
-                : 'bg-white'
-            }`}></span>
-            <span className={`block w-6 h-0.5 transition-transform duration-300 ${
-              menuOpen 
-                ? '-rotate-45 -translate-y-2 bg-[var(--color-text-primary)]' 
-                : 'bg-white'
-            }`}></span>
-          </button>
-
-          {menuOpen && (
-            <div className="absolute top-full left-0 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex flex-col p-5 gap-1 md:hidden z-50 shadow-md">
-              {navItems.map((item) => (
-                <a 
-                  key={item} 
-                  href="#" 
-                  className={`px-4 py-2.5 rounded-lg text-sm transition-colors ${
-                    item === 'Products' 
-                      ? 'bg-[var(--color-surface-alt)] font-medium text-[var(--color-text-primary)]' 
-                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-alt)]'
-                  }`}
-                >
-                  {item}
-                </a>
-              ))}
-              <button className="flex items-center gap-2.5 bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] text-sm font-medium pl-5 pr-2 py-2 rounded-full cursor-pointer border-0 mt-3 w-fit hover:opacity-90 transition-opacity">
-                Get started
-                <span className="size-7 rounded-full bg-[var(--color-surface)] flex items-center justify-center">
-                  <svg width="12" height="10" viewBox="0 0 12 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M.6 4.602h10m-4-4 4 4-4 4" stroke="var(--color-text-primary)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      </motion.header>
+      <Navbar />
 
       {/* 2. Hero Intro Section */}
       <section 
@@ -277,164 +162,65 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Wave Divider 1: Transitioning from Bg (--color-bg) to Problem (--color-surface) */}
-      <div className="w-full bg-[var(--color-bg)]">
-        <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,0 C300,80 900,-40 1200,60 L1200,120 L0,120 Z" fill="var(--color-surface)" />
-        </svg>
-      </div>
-
-      {/* 3. Problem Section (bg: --color-surface) */}
-      <section id="problem" className="py-16 md:py-24 bg-[var(--color-surface)]">
+      {/* 3. Problem Section (bg: --color-surface-alt) */}
+      <section id="problem" className="py-16 md:py-24 bg-[var(--color-surface-alt)] border-b border-[var(--color-border)] relative">
         <div className="max-w-[1160px] mx-auto px-4 md:px-8">
           <div className="text-center max-w-[640px] mx-auto mb-16 reveal">
-            <span className="t-label text-[var(--color-accent)] mb-3 block">
-              The Support Bottleneck
+            <span className="t-label text-[var(--color-accent)] mb-3 block tracking-widest font-semibold">
+              THE PROBLEM
             </span>
-            <h2 className="t-section-heading text-[var(--color-text-primary)] mb-4">
-              Traditional Indian calling centers fail to scale
+            <h2 className="t-section-heading text-[var(--color-text-primary)] mb-5">
+              You&apos;re losing customers between rings
             </h2>
             <p className="t-body-lead text-[var(--color-text-secondary)]">
-              Managing a multilingual support operation in India is an operational nightmare. Human BPOs suffer from high turnover, overheads, and language limits.
+              Every missed call is a customer who goes to your competitor. Small businesses in India lose up to 40% of inbound inquiries simply because no one answered.
             </p>
           </div>
 
-          {/* Cards Grid: 12-col layout, rounded.xl (24px) cards, flat shadows */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 reveal-stagger">
-            
-            {/* Card 1: Missed Calls */}
-            <div className="bg-[var(--color-surface)] rounded-[24px] border border-[var(--color-border)] p-8 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover-lift flex flex-col items-start gap-5">
-              <div className="p-3 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)]">
-                <MissedCallsIllustration size={32} />
-              </div>
-              <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)]">
-                40% Missed Inbound Calls
-              </h3>
-              <p className="t-body text-sm text-[var(--color-text-secondary)]">
-                Indian businesses face massive spikes during peak hours and holidays. Unanswered calls mean direct loss of warm leads and frustrated customers.
-              </p>
-            </div>
-
-            {/* Card 2: Ops Cost */}
-            <div className="bg-[var(--color-surface)] rounded-[24px] border border-[var(--color-border)] p-8 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover-lift flex flex-col items-start gap-5">
-              <div className="p-3 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)]">
-                <CostIllustration size={32} />
-              </div>
-              <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)]">
-                Exorbitant Scaling Costs
-              </h3>
-              <p className="t-body text-sm text-[var(--color-text-secondary)]">
-                Hiring, training, and managing human agents is expensive. Scalability is slow and costly, especially when handling high-volume outbound campaigns.
-              </p>
-            </div>
-
-            {/* Card 3: Language Barrier */}
-            <div className="bg-[var(--color-surface)] rounded-[24px] border border-[var(--color-border)] p-8 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover-lift flex flex-col items-start gap-5">
-              <div className="p-3 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)]">
-                <LanguageIllustration size={32} />
-              </div>
-              <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)]">
-                Dialect & Accent Barriers
-              </h3>
-              <p className="t-body text-sm text-[var(--color-text-secondary)]">
-                Customers prefer speaking in local tongues, but BPOs can&apos;t cover all regional dialects economically. Rigid IVR menus confuse and alienate callers.
-              </p>
-            </div>
-
-          </div>
+          <ScrollStack>
+            <ScrollStackItem
+              indicatorColor="blue"
+              title="Ad Waste"
+              description="Running meta ads but missing the calls they generate."
+              icon={
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.546 1.16 3.694.933 5-.308a3.75 3.75 0 0 0 0-5.304c-1.306-1.307-3.454-1.534-5-.308L9 9.182m-3 6.364L18 9" />
+                </svg>
+              }
+            />
+            <ScrollStackItem
+              indicatorColor="orange"
+              title="In-Moment Friction"
+              description="Busy with actual work when customers call."
+              icon={
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              }
+            />
+            <ScrollStackItem
+              indicatorColor="purple"
+              title="Capacity Limits"
+              description="No staff to manage incoming queries 24/7."
+              icon={
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.97 5.97 0 0 0-.75-2.985m-.94-3.198a4.478 4.478 0 0 0-8.62 0m8.62 0a4.478 4.478 0 1 1-8.62 0m-4.14 8.24A9.094 9.094 0 0 1 2.26 18.24a3 3 0 0 1 4.686-2.724m-.94 3.197-.002.031c0 .225.012.447.037.666A11.944 11.944 0 0 0 12 21" />
+                </svg>
+              }
+            />
+          </ScrollStack>
         </div>
       </section>
 
-      {/* Wave Divider 2: Transitioning from Problem (--color-surface) to Stats Bar (--color-dark-bg) */}
-      <div className="w-full bg-[var(--color-surface)]">
-        <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,60 C300,10 900,110 1200,30 L1200,120 L0,120 Z" fill="var(--color-dark-bg)" />
-        </svg>
-      </div>
-
-      {/* 4. Stats Bar (bg: --color-dark-bg) */}
-      <section id="stats" className="py-16 bg-[var(--color-dark-bg)] text-[var(--color-dark-text)]">
-        <div className="max-w-[1160px] mx-auto px-4 md:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 reveal text-center">
-            
-            {/* Stat 1 */}
-            <div className="flex flex-col items-center gap-2">
-              <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
-                data-target="2.5"
-                data-start="0"
-                data-prefix="Sub-"
-                data-suffix="s"
-                data-decimals="1"
-              >
-                Sub-0.0s
-              </span>
-              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
-                Response Time
-              </span>
-              <span className="text-xs text-zinc-500 max-w-[200px]">
-                Near-instant multilingual voice answers
-              </span>
-            </div>
-
-            {/* Stat 2 */}
-            <div className="flex flex-col items-center gap-2">
-              <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
-                data-target="3"
-                data-start="0"
-                data-suffix=" Languages"
-              >
-                0 Languages
-              </span>
-              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
-                Hindi, Hinglish, English
-              </span>
-              <span className="text-xs text-zinc-500 max-w-[200px]">
-                Answering in customers' preferred dialects
-              </span>
-            </div>
-
-            {/* Stat 3 */}
-            <div className="flex flex-col items-center gap-2">
-              <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
-                data-target="0"
-                data-start="15"
-                data-final-text="Zero"
-              >
-                15
-              </span>
-              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
-                Missed Leads
-              </span>
-              <span className="text-xs text-zinc-500 max-w-[200px]">
-                Every single inbound call answered instantly
-              </span>
-            </div>
-
-            {/* Stat 4 */}
-            <div className="flex flex-col items-center gap-2">
-              <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
-                data-target="24/7"
-              >
-                24/7
-              </span>
-              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
-                Always On
-              </span>
-              <span className="text-xs text-zinc-500 max-w-[200px]">
-                No queues, zero wait time, infinite capacity
-              </span>
-            </div>
-            
-          </div>
+      {/* 4. Stats Bar (bg: --color-bg) */}
+      <section id="stats" className="py-16 md:py-24 bg-[var(--color-bg)]">
+        <div className="max-w-[1160px] mx-auto px-4 md:px-8 reveal">
+          <BentoGrid />
         </div>
       </section>
 
-      {/* Wave Divider 3: Transitioning from Stats Bar (--color-dark-bg) to How It Works (--color-surface-alt) */}
-      <div className="w-full bg-[var(--color-dark-bg)]">
+      {/* Wave Divider 3: Transitioning from Stats Bar (--color-bg) to How It Works (--color-surface-alt) */}
+      <div className="w-full bg-[var(--color-bg)]">
         <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M0,20 C400,100 800,0 1200,80 L1200,120 L0,120 Z" fill="var(--color-surface-alt)" />
         </svg>
