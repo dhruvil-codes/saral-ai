@@ -7,9 +7,9 @@ import {
   MissedCallsIllustration,
   CostIllustration,
   LanguageIllustration,
-  StepDesignIllustration,
-  StepConnectIllustration,
-  StepLiveIllustration,
+  StepCallIllustration,
+  StepAnswerIllustration,
+  StepSummaryIllustration,
 } from "../components/LineArt";
 
 export default function Home() {
@@ -345,63 +345,87 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Wave Divider 2: Transitioning from Problem (--color-surface) to Stats & How It Works (--color-surface-alt) */}
+      {/* Wave Divider 2: Transitioning from Problem (--color-surface) to Stats Bar (--color-dark-bg) */}
       <div className="w-full bg-[var(--color-surface)]">
         <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,60 C300,10 900,110 1200,30 L1200,120 L0,120 Z" fill="var(--color-surface-alt)" />
+          <path d="M0,60 C300,10 900,110 1200,30 L1200,120 L0,120 Z" fill="var(--color-dark-bg)" />
         </svg>
       </div>
 
-      {/* 4. Stats Bar (bg: --color-surface-alt) */}
-      <section id="stats" className="py-16 bg-[var(--color-surface-alt)]">
+      {/* 4. Stats Bar (bg: --color-dark-bg) */}
+      <section id="stats" className="py-16 bg-[var(--color-dark-bg)] text-[var(--color-dark-text)]">
         <div className="max-w-[1160px] mx-auto px-4 md:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 reveal text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 reveal text-center">
             
             {/* Stat 1 */}
             <div className="flex flex-col items-center gap-2">
               <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-text-primary)]" 
-                data-target="98%"
+                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
+                data-target="2.5"
+                data-start="0"
+                data-prefix="Sub-"
+                data-suffix="s"
+                data-decimals="1"
               >
-                0%
+                Sub-0.0s
               </span>
-              <span className="text-sm font-semibold tracking-wide text-[var(--color-text-secondary)] uppercase">
-                Customer CSAT Rating
+              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
+                Response Time
               </span>
-              <span className="text-xs text-[var(--color-text-muted)] max-w-[200px]">
-                Inbound support queries resolved on first contact
+              <span className="text-xs text-zinc-500 max-w-[200px]">
+                Near-instant multilingual voice answers
               </span>
             </div>
 
             {/* Stat 2 */}
-            <div className="flex flex-col items-center gap-2 border-y md:border-y-0 md:border-x border-[var(--color-border)] py-8 md:py-0">
+            <div className="flex flex-col items-center gap-2">
               <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-text-primary)]" 
-                data-target="24/7"
+                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
+                data-target="3"
+                data-start="0"
+                data-suffix=" Languages"
               >
-                24/7
+                0 Languages
               </span>
-              <span className="text-sm font-semibold tracking-wide text-[var(--color-text-secondary)] uppercase">
-                Instant Availability
+              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
+                Hindi, Hinglish, English
               </span>
-              <span className="text-xs text-[var(--color-text-muted)] max-w-[200px]">
-                No queues, zero wait time, and infinite concurrency
+              <span className="text-xs text-zinc-500 max-w-[200px]">
+                Answering in customers' preferred dialects
               </span>
             </div>
 
             {/* Stat 3 */}
             <div className="flex flex-col items-center gap-2">
               <span 
-                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-text-primary)]" 
-                data-target="5x"
+                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
+                data-target="0"
+                data-start="15"
+                data-final-text="Zero"
               >
-                1x
+                15
               </span>
-              <span className="text-sm font-semibold tracking-wide text-[var(--color-text-secondary)] uppercase">
-                Cost Reduction
+              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
+                Missed Leads
               </span>
-              <span className="text-xs text-[var(--color-text-muted)] max-w-[200px]">
-                Highly efficient vs hiring traditional BPO seats
+              <span className="text-xs text-zinc-500 max-w-[200px]">
+                Every single inbound call answered instantly
+              </span>
+            </div>
+
+            {/* Stat 4 */}
+            <div className="flex flex-col items-center gap-2">
+              <span 
+                className="font-display text-5xl md:text-6xl font-bold text-[var(--color-dark-text)]" 
+                data-target="24/7"
+              >
+                24/7
+              </span>
+              <span className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
+                Always On
+              </span>
+              <span className="text-xs text-zinc-500 max-w-[200px]">
+                No queues, zero wait time, infinite capacity
               </span>
             </div>
             
@@ -409,18 +433,25 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Wave Divider 3: Transitioning from Stats Bar (--color-dark-bg) to How It Works (--color-surface-alt) */}
+      <div className="w-full bg-[var(--color-dark-bg)]">
+        <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,20 C400,100 800,0 1200,80 L1200,120 L0,120 Z" fill="var(--color-surface-alt)" />
+        </svg>
+      </div>
+
       {/* 5. How It Works Section (bg: --color-surface-alt, shares transition with Stats Bar) */}
       <section id="how-it-works" className="py-16 md:py-24 bg-[var(--color-surface-alt)] border-t border-[var(--color-border)]">
         <div className="max-w-[1160px] mx-auto px-4 md:px-8">
           <div className="text-center max-w-[640px] mx-auto mb-16 reveal">
             <span className="t-label text-[var(--color-accent)] mb-3 block">
-              Simple Deployment
+              How It Works
             </span>
             <h2 className="t-section-heading text-[var(--color-text-primary)] mb-4">
-              Set up your voice channel in minutes
+              Three simple steps to zero missed leads
             </h2>
             <p className="t-body-lead text-[var(--color-text-secondary)]">
-              No complex coding. Simply describe your business logic, link your phone line, and let Saral AI automate your calls on autopilot.
+              Set up your voice intelligence channel on autopilot and capture every inbound query instantly.
             </p>
           </div>
 
@@ -428,51 +459,57 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 reveal-stagger relative">
             
             {/* Step 1 */}
-            <div className="flex flex-col items-center text-center gap-4 relative">
-              <div className="p-4 bg-[var(--color-surface)] rounded-full text-[var(--color-text-primary)] border border-[var(--color-border)]">
-                <StepDesignIllustration size={48} />
-              </div>
-              <div className="bg-[var(--color-accent)] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center -mt-8 z-10 border border-white">
+            <div className="flex flex-col items-center text-center gap-5 relative">
+              <span className="font-display italic text-6xl md:text-7xl text-[var(--color-accent)] font-semibold select-none leading-none">
                 1
+              </span>
+              <div className="p-4 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)] flex items-center justify-center">
+                <StepCallIllustration size={40} />
               </div>
-              <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
-                Configure Persona & Tone
-              </h3>
-              <p className="t-body text-sm text-[var(--color-text-secondary)] px-4">
-                Name your agent, define its script, choose its tone (formal/friendly), and select languages. Supports English, Hindi, Hinglish, and regional dialects.
-              </p>
+              <div>
+                <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)] mb-2">
+                  Customer calls your number
+                </h3>
+                <p className="t-body text-sm text-[var(--color-text-secondary)] px-4 leading-relaxed">
+                  They dial your business number. No confusing IVR paths, no holding queues — the call connects instantly.
+                </p>
+              </div>
             </div>
 
             {/* Step 2 */}
-            <div className="flex flex-col items-center text-center gap-4 relative">
-              <div className="p-4 bg-[var(--color-surface)] rounded-full text-[var(--color-text-primary)] border border-[var(--color-border)]">
-                <StepConnectIllustration size={48} />
-              </div>
-              <div className="bg-[var(--color-accent)] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center -mt-8 z-10 border border-white">
+            <div className="flex flex-col items-center text-center gap-5 relative">
+              <span className="font-display italic text-6xl md:text-7xl text-[var(--color-accent)] font-semibold select-none leading-none">
                 2
+              </span>
+              <div className="p-4 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)] flex items-center justify-center">
+                <StepAnswerIllustration size={40} />
               </div>
-              <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
-                Connect API & Phone Lines
-              </h3>
-              <p className="t-body text-sm text-[var(--color-text-secondary)] px-4">
-                Connect your existing SIP trunks, phone numbers, or CRM tables. Saral AI fetches customer details and records call logs automatically.
-              </p>
+              <div>
+                <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)] mb-2">
+                  Saral AI answers
+                </h3>
+                <p className="t-body text-sm text-[var(--color-text-secondary)] px-4 leading-relaxed">
+                  Our voice agent responds in Hindi, Hinglish, or English, answering queries and qualifying details.
+                </p>
+              </div>
             </div>
 
             {/* Step 3 */}
-            <div className="flex flex-col items-center text-center gap-4 relative">
-              <div className="p-4 bg-[var(--color-surface)] rounded-full text-[var(--color-text-primary)] border border-[var(--color-border)]">
-                <StepLiveIllustration size={48} />
-              </div>
-              <div className="bg-[var(--color-accent)] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center -mt-8 z-10 border border-white">
+            <div className="flex flex-col items-center text-center gap-5 relative">
+              <span className="font-display italic text-6xl md:text-7xl text-[var(--color-accent)] font-semibold select-none leading-none">
                 3
+              </span>
+              <div className="p-4 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)] flex items-center justify-center">
+                <StepSummaryIllustration size={40} />
               </div>
-              <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
-                Activate Autopilot Scale
-              </h3>
-              <p className="t-body text-sm text-[var(--color-text-secondary)] px-4">
-                Launch your agent. It handles inbound support calls or starts outbound calling instantly, logging structured summaries and CSAT metrics.
-              </p>
+              <div>
+                <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)] mb-2">
+                  Get a WhatsApp summary
+                </h3>
+                <p className="t-body text-sm text-[var(--color-text-secondary)] px-4 leading-relaxed">
+                  Receive structured lead details, urgency levels, and caller sentiment directly to your phone.
+                </p>
+              </div>
             </div>
             
           </div>
@@ -490,12 +527,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Wave Divider 3: Transitioning from Surface Alt (--color-surface-alt) to Dark Bg (--color-dark-bg) */}
-      <div className="w-full bg-[var(--color-surface-alt)]">
-        <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,20 C400,100 800,0 1200,80 L1200,120 L0,120 Z" fill="var(--color-dark-bg)" />
-        </svg>
-      </div>
+
 
       {/* 6. Footer (bg: --color-dark-bg) */}
       <footer className="bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] py-16 md:py-20">

@@ -34,29 +34,45 @@ export default function ScrollObserver() {
             targetEl.dataset.animated = "true";
             
             const targetStr = targetEl.dataset.target || "0";
-            const isPercent = targetStr.includes("%");
-            const isMultiplier = targetStr.includes("x");
-            const isUptime = targetStr.includes("/");
             
-            // Extract raw number to animate
-            let targetValue = 0;
-            let suffix = "";
-            const prefix = "";
-
-            if (isPercent) {
-              targetValue = parseInt(targetStr.replace("%", ""), 10);
-              suffix = "%";
-            } else if (isMultiplier) {
-              targetValue = parseInt(targetStr.replace("x", ""), 10);
-              suffix = "x";
-            } else if (isUptime) {
-              // Specialized handling for uptime or response e.g., "24/7"
+            // Check for direct bypass e.g. "24/7"
+            if (targetStr.includes("/")) {
               targetEl.textContent = targetStr;
               counterObserver.unobserve(targetEl);
               return;
-            } else {
-              targetValue = parseInt(targetStr, 10);
             }
+
+            // Custom configuration attributes
+            const prefix = targetEl.dataset.prefix || "";
+            const suffix = targetEl.dataset.suffix || "";
+            const decimals = parseInt(targetEl.dataset.decimals || "0", 10);
+            const finalText = targetEl.dataset.finalText || "";
+            
+            let startVal = parseFloat(targetEl.dataset.start || "0");
+            let targetVal = 0;
+            let displaySuffix = suffix;
+            let displayPrefix = prefix;
+
+            // Fallback parsing for legacy targets (e.g. "98%", "5x")
+            if (!targetEl.dataset.prefix && !targetEl.dataset.suffix && !targetEl.dataset.decimals && !targetEl.dataset.start) {
+              const isPercent = targetStr.includes("%");
+              const isMultiplier = targetStr.includes("x");
+              
+              if (isPercent) {
+                targetVal = parseFloat(targetStr.replace("%", ""));
+                displaySuffix = "%";
+              } else if (isMultiplier) {
+                targetVal = parseFloat(targetStr.replace("x", ""));
+                displaySuffix = "x";
+              } else {
+                targetVal = parseFloat(targetStr);
+              }
+            } else {
+              targetVal = parseFloat(targetStr);
+            }
+
+            if (isNaN(targetVal)) targetVal = 0;
+            if (isNaN(startVal)) startVal = 0;
 
             const duration = 2000; // Animate over 2 seconds
             const startTime = performance.now();
@@ -67,14 +83,20 @@ export default function ScrollObserver() {
               
               // Easing out cubic for smooth slowing at the end
               const easeProgress = 1 - Math.pow(1 - progress, 3);
-              const currentValue = Math.floor(easeProgress * targetValue);
+              const currentValue = startVal + easeProgress * (targetVal - startVal);
+              
+              const formattedValue = currentValue.toFixed(decimals);
 
-              targetEl.textContent = `${prefix}${currentValue}${suffix}`;
+              targetEl.textContent = `${displayPrefix}${formattedValue}${displaySuffix}`;
 
               if (progress < 1) {
                 requestAnimationFrame(animateValue);
               } else {
-                targetEl.textContent = targetStr;
+                if (finalText) {
+                  targetEl.textContent = finalText;
+                } else {
+                  targetEl.textContent = `${displayPrefix}${targetVal.toFixed(decimals)}${displaySuffix}`;
+                }
               }
             };
 
