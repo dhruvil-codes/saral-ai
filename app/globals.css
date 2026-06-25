@@ -229,9 +229,6 @@ html, body {
 }
 
 #main-nav.scrolled {
-  background-color: rgba(245, 245, 240, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom-color: var(--color-border);
   padding-top: var(--space-3);
   padding-bottom: var(--space-3);
 }
@@ -247,16 +244,4 @@ html, body {
 
 .scrolled-dark-bg {
   transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-#main-nav.scrolled .scrolled-dark {
-  color: var(--color-text-primary) !important;
-}
-
-#main-nav.scrolled .scrolled-dark-svg {
-  color: var(--color-text-primary) !important;
-}
-
-#main-nav.scrolled .scrolled-dark-bg {
-  background-color: var(--color-text-primary) !important;
 }

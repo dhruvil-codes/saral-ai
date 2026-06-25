@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import ScrollObserver from "../components/ScrollObserver";
 import {
   MissedCallsIllustration,
@@ -13,7 +14,25 @@ import {
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [inHero, setInHero] = useState(true);
   const navItems = ['Products', 'Services', 'Apps', 'Pricing', 'About'];
+
+  useEffect(() => {
+    const hero = document.getElementById("hero-section");
+    if (!hero) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setInHero(entry.isIntersecting);
+      },
+      {
+        threshold: 0,
+      }
+    );
+
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased select-none font-sans overflow-x-hidden">
@@ -21,10 +40,20 @@ export default function Home() {
       <ScrollObserver />
 
       {/* 1. Navigation Header (Sticky, transition triggers on scroll) */}
-      <header id="main-nav" className="fixed top-0 z-50 py-4 w-full">
+      <motion.header 
+        id="main-nav" 
+        className="fixed top-0 z-50 py-4 w-full"
+        initial={{ y: 0, opacity: 1 }}
+        animate={{ 
+          y: inHero ? 0 : -100, 
+          opacity: inHero ? 1 : 0 
+        }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        style={{ pointerEvents: inHero ? "auto" : "none" }}
+      >
         <div className="max-w-[1160px] mx-auto px-4 md:px-8 flex items-center justify-between relative">
-          <a href="#" className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-[var(--color-surface)] scrolled-dark hover:opacity-90 transition-opacity">
-            <svg width="26" height="36" viewBox="0 0 26 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[var(--color-surface)] scrolled-dark-svg">
+          <a href="#" className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight !text-white hover:opacity-90 transition-opacity">
+            <svg width="26" height="36" viewBox="0 0 26 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="!text-white">
               <path d="m7.25 10.86 6 3.366 6-3.367m-12 20.176v-6.721l-6-3.367m24 0-6 3.367v6.72M1.61 14.42l11.64 6.54 11.64-6.54M13.25 34V20.947m12 5.18v-10.36c0-.454-.124-.9-.358-1.293a2.63 2.63 0 0 0-.975-.947l-9.333-5.18a2.73 2.73 0 0 0-2.667 0l-9.333 5.18a2.63 2.63 0 0 0-.976.947 2.54 2.54 0 0 0-.358 1.293v10.36c0 .454.124.9.358 1.293s.57.72.976.947l9.333 5.18a2.73 2.73 0 0 0 2.667 0l9.333-5.18a2.63 2.63 0 0 0 .975-.947 2.53 2.53 0 0 0 .358-1.293" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span>Saral AI</span>
@@ -62,17 +91,17 @@ export default function Home() {
             <span className={`block w-6 h-0.5 transition-transform duration-300 ${
               menuOpen 
                 ? 'rotate-45 translate-y-2 bg-[var(--color-text-primary)]' 
-                : 'bg-[var(--color-surface)] scrolled-dark-bg'
+                : 'bg-white'
             }`}></span>
             <span className={`block w-6 h-0.5 transition-opacity duration-300 ${
               menuOpen 
                 ? 'opacity-0' 
-                : 'bg-[var(--color-surface)] scrolled-dark-bg'
+                : 'bg-white'
             }`}></span>
             <span className={`block w-6 h-0.5 transition-transform duration-300 ${
               menuOpen 
                 ? '-rotate-45 -translate-y-2 bg-[var(--color-text-primary)]' 
-                : 'bg-[var(--color-surface)] scrolled-dark-bg'
+                : 'bg-white'
             }`}></span>
           </button>
 
@@ -102,10 +131,11 @@ export default function Home() {
             </div>
           )}
         </div>
-      </header>
+      </motion.header>
 
       {/* 2. Hero Intro Section */}
       <section 
+        id="hero-section"
         className="pt-32 md:pt-40 pb-0 text-center relative overflow-hidden bg-cover bg-center !text-white" 
         style={{ backgroundImage: 'url("/hero-bg.png")' }}
       >
