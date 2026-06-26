@@ -4,12 +4,23 @@ Handles real-time speech and silence detection on audio streams.
 Supports webrtcvad (if installed) and falls back to RMS energy thresholding.
 """
 
+import os
 import math
 import struct
 import logging
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Try to import onnxruntime and numpy for Silero VAD
+try:
+    import onnxruntime as ort
+    import numpy as np
+    ONNXRUNTIME_AVAILABLE = True
+    logger.info("onnxruntime/numpy available. Silero VAD can be loaded if model path is set.")
+except ImportError:
+    ONNXRUNTIME_AVAILABLE = False
+    logger.info("onnxruntime or numpy not found. Silero VAD will be disabled.")
 
 # Try to import webrtcvad
 try:
@@ -51,6 +62,19 @@ class VoiceActivityDetector:
         self.bytes_per_sample = self.sample_width * self.channels
         self.bytes_per_ms = (self.sample_rate * self.bytes_per_sample) / 1000.0
         
+        # Initialize Silero VAD if available
+        self.silero_session = None
+        if ONNXRUNTIME_AVAILABLE and getattr(settings, "SILERO_MODEL_PATH", ""):
+            model_path = settings.SILERO_MODEL_PATH
+            if os.path.exists(model_path):
+                try:
+                    self.silero_session = ort.InferenceSession(model_path)
+                    logger.info(f"Loaded Silero VAD ONNX model from {model_path}")
+                except Exception as e:
+                    logger.error(f"Failed to load Silero VAD ONNX model: {e}")
+            else:
+                logger.warning(f"Silero VAD model path configured but file does not exist: {model_path}")
+        
         # Initialize webrtcvad if available
         self.vad = None
         if WEBRTCVAD_AVAILABLE:
@@ -69,6 +93,10 @@ class VoiceActivityDetector:
         self.silence_accumulated_ms = 0.0
         self.last_speech_time_ms = 0.0
         self.total_processed_ms = 0.0
+        
+        # Reset Silero VAD state
+        if self.silero_session is not None:
+            self.silero_state = np.zeros((2, 1, 64), dtype=np.float32)
 
     def is_container_format(self, data: bytes) -> bool:
         """
@@ -114,8 +142,12 @@ class VoiceActivityDetector:
             self.speech_detected = True
             return False
             
-        # Frame size for VAD analysis (webrtcvad requires 10, 20, or 30ms frames)
-        frame_duration_ms = 20
+        # Frame size for VAD analysis (webrtcvad requires 10, 20, or 30ms frames; Silero supports 32ms/512 samples)
+        if self.silero_session is not None:
+            frame_duration_ms = 32
+        else:
+            frame_duration_ms = 20
+            
         frame_size = int(frame_duration_ms * self.bytes_per_ms)
         
         # We process newly added bytes.
@@ -155,7 +187,30 @@ class VoiceActivityDetector:
 
     def _is_frame_speech(self, frame: bytes) -> bool:
         """Helper to determine if a single PCM frame contains speech."""
-        # 1. Try webrtcvad if available
+        # 1. Try Silero VAD if session is active
+        if self.silero_session is not None:
+            try:
+                num_samples = len(frame) // self.sample_width
+                fmt = f"<{num_samples}h"
+                samples = struct.unpack(fmt, frame[:num_samples * self.sample_width])
+                # Normalize float values to [-1.0, 1.0]
+                audio_float = np.array(samples, dtype=np.float32) / 32768.0
+                audio_float = np.expand_dims(audio_float, axis=0) # (1, samples)
+                
+                ort_inputs = {
+                    "input": audio_float,
+                    "state": self.silero_state,
+                    "sr": np.array([self.sample_rate], dtype=np.int64)
+                }
+                ort_outs = self.silero_session.run(None, ort_inputs)
+                prob = ort_outs[0][0][0]
+                self.silero_state = ort_outs[1]
+                
+                return prob > 0.5
+            except Exception as e:
+                logger.error(f"Silero VAD inference error: {e}. Falling back to other VAD methods.")
+                
+        # 2. Try webrtcvad if available
         if self.vad is not None:
             try:
                 # webrtcvad expects exact frame size and 16-bit mono PCM.
@@ -165,7 +220,7 @@ class VoiceActivityDetector:
                 # Fallback to RMS on any error
                 pass
                 
-        # 2. RMS fallback
+        # 3. RMS fallback
         rms = self._calculate_rms(frame)
         return rms > self.rms_threshold
 

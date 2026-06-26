@@ -3,16 +3,17 @@
 import ScrollObserver from "../components/ScrollObserver";
 import Navbar from "../components/shadcn-space/blocks/navbar-01/navbar";
 import BentoGrid from "../components/kokonutui/bento-grid";
-import ScrollStack, { ScrollStackItem } from "./ScrollStack";
 import {
   StepCallIllustration,
   StepAnswerIllustration,
   StepSummaryIllustration,
 } from "../components/LineArt";
+import ProblemFeatures from "../components/ui/problem-features";
+import { Megaphone, Clock, UserX } from "lucide-react";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased select-none font-sans overflow-x-hidden">
+    <main className="landing-page min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased select-none font-sans overflow-x-hidden">
       {/* Client-side scroll observer & metrics count-up triggers */}
       <ScrollObserver />
 
@@ -177,38 +178,26 @@ export default function Home() {
             </p>
           </div>
 
-          <ScrollStack>
-            <ScrollStackItem
-              indicatorColor="blue"
-              title="Ad Waste"
-              description="Running meta ads but missing the calls they generate."
-              icon={
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.546 1.16 3.694.933 5-.308a3.75 3.75 0 0 0 0-5.304c-1.306-1.307-3.454-1.534-5-.308L9 9.182m-3 6.364L18 9" />
-                </svg>
-              }
-            />
-            <ScrollStackItem
-              indicatorColor="orange"
-              title="In-Moment Friction"
-              description="Busy with actual work when customers call."
-              icon={
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-              }
-            />
-            <ScrollStackItem
-              indicatorColor="purple"
-              title="Capacity Limits"
-              description="No staff to manage incoming queries 24/7."
-              icon={
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.97 5.97 0 0 0-.75-2.985m-.94-3.198a4.478 4.478 0 0 0-8.62 0m8.62 0a4.478 4.478 0 1 1-8.62 0m-4.14 8.24A9.094 9.094 0 0 1 2.26 18.24a3 3 0 0 1 4.686-2.724m-.94 3.197-.002.031c0 .225.012.447.037.666A11.944 11.944 0 0 0 12 21" />
-                </svg>
-              }
-            />
-          </ScrollStack>
+          {/* Aceternity-style interactive features section */}
+          <ProblemFeatures
+            features={[
+              {
+                title: "Ad Waste",
+                description: "Running meta ads but missing the calls they generate.",
+                icon: <Megaphone className="w-5.5 h-5.5" strokeWidth={1.5} />,
+              },
+              {
+                title: "In-Moment Friction",
+                description: "Busy with actual work when customers call.",
+                icon: <Clock className="w-5.5 h-5.5" strokeWidth={1.5} />,
+              },
+              {
+                title: "Capacity Limits",
+                description: "No staff to manage incoming queries 24/7.",
+                icon: <UserX className="w-5.5 h-5.5" strokeWidth={1.5} />,
+              },
+            ]}
+          />
         </div>
       </section>
 

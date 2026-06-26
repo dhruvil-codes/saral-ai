@@ -8,6 +8,7 @@ import uuid
 import json
 import logging
 import asyncio
+from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
@@ -15,6 +16,10 @@ from app.services.sarvam import speech_to_text, text_to_speech, text_to_speech_s
 from app.services.groq_llm import get_response
 from app.services.fallback_audio import get_fallback_audio
 from app.utils.vad import VoiceActivityDetector
+from app.services.intent_cache import semantic_cache
+from app.services.supabase_db import get_relevant_faqs
+from app.db.supabase_client import get_supabase
+from app.services.whatsapp import send_post_call_summary
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -44,7 +49,7 @@ async def _play_fallback_audio(websocket: WebSocket, phrase_id: str, language: s
         logger.error(f"Failed to play fallback audio: {str(e)}", exc_info=True)
 
 @router.websocket("/ws/call")
-async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id: str = None):
+async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id: str = None, user_id: str = None):
     """
     WebSocket endpoint for real-time voice call handling.
     Accepts raw audio bytes, transcribes them using Sarvam STT,
@@ -56,7 +61,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
     if not call_id:
         call_id = str(uuid.uuid4())
         
-    logger.info(f"WebSocket connection established with language={language}, call_id={call_id}")
+    logger.info(f"WebSocket connection established with language={language}, call_id={call_id}, user_id={user_id}")
     
     conversation_history = []
     turn_number = 0
@@ -176,16 +181,79 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 if len(conversation_history) > MAX_HISTORY:
                     conversation_history = conversation_history[-MAX_HISTORY:]
                 
+                llm_ms = 0
+                tts_ms = 0
+
+                # 4.5 Semantic Cache Lookup
+                cache_hit = await semantic_cache.lookup(transcript, language)
+                if cache_hit:
+                    logger.info("Semantic cache HIT. Returning cached response immediately.")
+                    cached_reply = cache_hit["response"]
+                    cached_audio = cache_hit["audio_bytes"]
+                    
+                    conversation_history.append({
+                        "role": "assistant",
+                        "content": cached_reply
+                    })
+                    if len(conversation_history) > MAX_HISTORY:
+                        conversation_history = conversation_history[-MAX_HISTORY:]
+                        
+                    await websocket.send_json({
+                        "status": "tts_start"
+                    })
+                    if cached_audio:
+                        await websocket.send_bytes(cached_audio)
+                    else:
+                        async for chunk in text_to_speech_stream(cached_reply, language):
+                            if chunk:
+                                await websocket.send_bytes(chunk)
+                                
+                    await websocket.send_json({
+                        "status": "tts_end"
+                    })
+                    
+                    # Latency logging for cache hit
+                    latency_log = {
+                        "call_id": call_id,
+                        "turn_number": turn_number,
+                        "stt_ms": stt_ms,
+                        "stt_api_ms": stt_api_ms,
+                        "stt_buffering_overhead_ms": buffering_overhead_ms,
+                        "stt_silence_wait_ms": silence_wait_ms,
+                        "llm_ms": 0,
+                        "tts_ms": 0,
+                        "total_ms": stt_ms,
+                        "transcript_length": len(transcript),
+                        "response_length": len(cached_reply),
+                        "cache_hit": True
+                    }
+                    logger.info(json.dumps(latency_log))
+                    continue
+
+                # 4.6 RAG dynamically querying Supabase for relevant FAQs
+                system_prompt = None
+                if user_id:
+                    try:
+                        emb = await semantic_cache.embed_text(transcript)
+                        faqs = await get_relevant_faqs(emb.tolist(), user_id)
+                        if faqs:
+                            faq_context = "\n".join([
+                                f"- Question: {f['question']}\n  Answer: {f['answer']}"
+                                for f in faqs
+                            ])
+                            system_prompt = f"You are a helpful receptionist AI assistant for Saral AI.\n\nUse the following relevant business FAQs to answer the user's question:\n{faq_context}"
+                            logger.info(f"RAG: Injected {len(faqs)} relevant FAQs into system prompt.")
+                    except Exception as rag_err:
+                        logger.error(f"RAG: Error fetching FAQs: {rag_err}", exc_info=True)
+
                 # 5. Get LLM response
-                # Pass transcript as current message, and everything in history except that as past history.
-                # Note: history already contains the user message at index -1, so we pass conversation_history[:-1].
                 logger.info("Getting response from Groq LLM...")
                 llm_start = time.perf_counter()
                 
                 llm_reply = None
                 try:
                     llm_reply = await asyncio.wait_for(
-                        run_in_threadpool(get_response, transcript, conversation_history[:-1]),
+                        run_in_threadpool(get_response, transcript, conversation_history[:-1], system_prompt),
                         timeout=2.0
                     )
                 except asyncio.TimeoutError as te:
@@ -196,14 +264,14 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     logger.error(f"LLM HTTP Status Error on first attempt: {str(hse)}", exc_info=True)
                 except Exception as e:
                     logger.error(f"LLM General Failure on first attempt: {str(e)}", exc_info=True)
-
+ 
                 if llm_reply is None:
                     # Retry once with a shorter prompt
                     logger.info("Retrying LLM once with a shorter prompt...")
                     shorter_transcript = transcript[:50] if len(transcript) > 50 else transcript
                     try:
                         llm_reply = await asyncio.wait_for(
-                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1]),
+                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1], system_prompt),
                             timeout=2.0
                         )
                         logger.info(f"LLM Reply on retry: {llm_reply}")
@@ -215,12 +283,12 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         logger.error(f"LLM HTTP Status Error on retry: {str(hse)}", exc_info=True)
                     except Exception as e:
                         logger.error(f"LLM General Failure on retry: {str(e)}", exc_info=True)
-
+ 
                 if llm_reply is None:
                     # Fall back to "Let me have someone call you back" clip
                     await _play_fallback_audio(websocket, "llm_fallback", language)
                     continue
-
+ 
                 llm_end = time.perf_counter()
                 llm_ms = int(round((llm_end - llm_start) * 1000))
                 logger.info(f"LLM Reply: {llm_reply}")
@@ -247,6 +315,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 # Stream the chunks over the websocket
                 chunks_count = 0
                 total_bytes = 0
+                tts_audio_chunks = []
                 
                 async def stream_tts():
                     nonlocal chunks_count, total_bytes
@@ -254,8 +323,9 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         if chunk:
                             chunks_count += 1
                             total_bytes += len(chunk)
+                            tts_audio_chunks.append(chunk)
                             await websocket.send_bytes(chunk)
-
+ 
                 try:
                     await asyncio.wait_for(stream_tts(), timeout=20.0)
                     
@@ -267,6 +337,21 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     tts_end = time.perf_counter()
                     tts_ms = int(round((tts_end - tts_start) * 1000))
                     logger.info(f"Streamed {chunks_count} chunks ({total_bytes} bytes) back to client in {tts_ms}ms.")
+                    
+                    # Save to semantic cache on successful completion of turn
+                    if llm_reply and tts_audio_chunks:
+                        try:
+                            emb = await semantic_cache.embed_text(transcript)
+                            semantic_cache.add(
+                                text=transcript,
+                                response=llm_reply,
+                                language=language,
+                                embedding=emb,
+                                audio_bytes=b"".join(tts_audio_chunks)
+                            )
+                            logger.info("Successfully cached new user intent & TTS audio.")
+                        except Exception as cache_save_err:
+                            logger.warning(f"Failed to cache response: {cache_save_err}")
                 except asyncio.TimeoutError as te:
                     logger.error(f"TTS Timeout Error during streaming: {str(te)}", exc_info=True)
                     await websocket.close(code=1000)
@@ -318,3 +403,57 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
         logger.error(f"Unexpected error in websocket session: {str(e)}", exc_info=True)
     finally:
         logger.info("WebSocket call session finished. Cleaning up.")
+        # Perform post-call updates
+        if conversation_history:
+            # 1. Compile the full transcript
+            full_transcript = "\n".join([
+                f"{msg['role'].capitalize()}: {msg['content']}"
+                for msg in conversation_history
+                if msg['role'] in ['user', 'assistant']
+            ])
+            
+            # 2. Update database call logs and trigger WhatsApp
+            if call_id and user_id:
+                try:
+                    supabase = get_supabase()
+                    
+                    # Check if call log already exists to preserve caller_number
+                    existing_res = supabase.table("call_logs").select("caller_number").eq("id", call_id).execute()
+                    caller_number = "unknown"
+                    if existing_res.data:
+                        caller_number = existing_res.data[0].get("caller_number", "unknown")
+                    
+                    # Generate summary of the call via Groq LLM
+                    summary = "Call completed."
+                    if full_transcript.strip():
+                        try:
+                            summary_prompt = "Summarize the following phone call conversation in 1-2 sentences, highlighting customer requests and contact information:"
+                            summary = await run_in_threadpool(
+                                get_response,
+                                f"{summary_prompt}\n\nConversation:\n{full_transcript}",
+                                []
+                            )
+                        except Exception as sum_err:
+                            logger.error(f"Failed to generate call summary: {sum_err}")
+                            
+                    # Update call log in Supabase
+                    log_data = {
+                        "id": call_sid if 'call_sid' in locals() else call_id,
+                        "user_id": user_id,
+                        "caller_number": caller_number,
+                        "transcript": full_transcript,
+                        "summary": summary,
+                        "status": "completed",
+                        "ended_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    supabase.table("call_logs").upsert(log_data).execute()
+                    logger.info(f"Upserted call log {call_id} in Supabase with status completed.")
+                    
+                    # Fetch business user's whatsapp_number from database to send summary
+                    user_res = supabase.table("users").select("whatsapp_number").eq("id", user_id).execute()
+                    if user_res.data and user_res.data[0].get("whatsapp_number"):
+                        whatsapp_number = user_res.data[0]["whatsapp_number"]
+                        # Trigger WhatsApp message
+                        await send_post_call_summary(whatsapp_number, summary, user_id)
+                except Exception as db_err:
+                    logger.error(f"Failed to perform post-call logging/WhatsApp summary: {db_err}")

@@ -47,7 +47,8 @@ class TestWebSocketCall(unittest.TestCase):
 
             # Check mock parameter assertions
             mock_stt.assert_called_once_with(b"input-audio-bytes", "hi-IN")
-            mock_llm.assert_called_once_with("Hello receptionist", [])
+            self.assertEqual(mock_llm.call_args[0][0], "Hello receptionist")
+            self.assertEqual(mock_llm.call_args[0][1], [])
             mock_tts_stream.assert_called_once_with("Hello! How can I assist you?", "hi-IN")
 
     @patch("app.api.ws_call.get_fallback_audio")

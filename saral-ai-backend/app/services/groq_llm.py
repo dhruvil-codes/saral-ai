@@ -12,7 +12,7 @@ from groq import Groq, GroqError, APITimeoutError, APIStatusError
 # Load environment variables from .env if present
 load_dotenv()
 
-def get_response(user_message: str, conversation_history: List[Dict[str, Any]]) -> str:
+def get_response(user_message: str, conversation_history: List[Dict[str, Any]], system_prompt: str = None) -> str:
     """
     Sends the full conversation history plus the new user message to Groq and returns the assistant's reply.
 
@@ -20,6 +20,7 @@ def get_response(user_message: str, conversation_history: List[Dict[str, Any]]) 
         user_message (str): The latest message from the user.
         conversation_history (list): A list of dicts representing the conversation history.
                                      Expected format: [{'role': 'user', 'content': '...'}, ...]
+        system_prompt (str): Optional system prompt overrides/extensions (e.g. injected FAQs).
 
     Returns:
         str: The response text from the assistant.
@@ -56,11 +57,23 @@ def get_response(user_message: str, conversation_history: List[Dict[str, Any]]) 
             })
 
     # Ensure there is a system prompt present
-    has_system = any(m["role"] == "system" for m in messages)
-    if not has_system:
+    sys_content = system_prompt or "You are a helpful receptionist AI assistant for Saral AI."
+    
+    # Check if a system prompt is already in messages
+    system_index = -1
+    for i, m in enumerate(messages):
+        if m["role"] == "system":
+            system_index = i
+            break
+            
+    if system_index != -1:
+        # If dynamic system prompt is passed, update the existing system message content
+        if system_prompt:
+            messages[system_index]["content"] = system_prompt
+    else:
         messages.insert(0, {
             "role": "system",
-            "content": "You are a helpful receptionist AI assistant for Saral AI."
+            "content": sys_content
         })
 
     # Append the latest user message

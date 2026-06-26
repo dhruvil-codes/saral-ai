@@ -3,6 +3,7 @@ FAQ router.
 Handles CRUD operations for MSME business FAQs used by the AI receptionist.
 """
 
+import logging
 from datetime import datetime, timezone
 from typing import List
 from uuid import UUID
@@ -11,6 +12,9 @@ from pydantic import BaseModel
 
 from app.api.auth import get_current_user
 from app.db.supabase_client import get_supabase
+from app.services.intent_cache import semantic_cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -42,11 +46,23 @@ async def get_faqs(current_user: dict = Depends(get_current_user)):
 @router.post("/faqs", response_model=FAQResponse)
 async def create_faq(body: FAQCreate, current_user: dict = Depends(get_current_user)):
     supabase = get_supabase()
+    
+    # Generate question embedding for pgvector RAG
+    try:
+        emb = await semantic_cache.embed_text(body.question)
+        embedding_list = emb.tolist()
+    except Exception as e:
+        logger.warning(f"Could not generate embedding for FAQ creation: {e}")
+        embedding_list = None
+
     faq_data = {
         "user_id": current_user["id"],
         "question": body.question,
         "answer": body.answer
     }
+    if embedding_list is not None:
+        faq_data["embedding"] = embedding_list
+
     try:
         response = supabase.table("faqs").insert(faq_data).execute()
         if not response.data:
@@ -87,11 +103,20 @@ async def update_faq(id: UUID, body: FAQUpdate, current_user: dict = Depends(get
         )
     
     # 2. Update question, answer, and updated_at
+    try:
+        emb = await semantic_cache.embed_text(body.question)
+        embedding_list = emb.tolist()
+    except Exception as e:
+        logger.warning(f"Could not generate embedding for FAQ update: {e}")
+        embedding_list = None
+
     update_data = {
         "question": body.question,
         "answer": body.answer,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
+    if embedding_list is not None:
+        update_data["embedding"] = embedding_list
     
     try:
         update_response = supabase.table("faqs").update(update_data).eq("id", str(id)).execute()
