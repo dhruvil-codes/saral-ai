@@ -9,10 +9,9 @@ import {
   BookOpen,
   Settings,
   Bot,
-  ChevronUp,
-  User2,
   LogOut,
   ChevronsUpDown,
+  User2,
 } from "lucide-react";
 
 import {
@@ -35,7 +34,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
 
 const navItems = [
   {
@@ -85,18 +83,23 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
+    <Sidebar collapsible="icon" className="border-r border-border/60">
+      {/* Logo / Brand */}
+      <SidebarHeader className="border-b border-border/60 py-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Link href="/dashboard" className="flex items-center gap-2.5">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
                   <Bot className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Saral AI</span>
-                  <span className="truncate text-xs text-muted-foreground">Voice AI Dashboard</span>
+                  <span className="truncate font-semibold tracking-tight">
+                    Saral AI
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    Voice AI Dashboard
+                  </span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -104,64 +107,76 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      {/* Navigation */}
+      <SidebarContent className="py-2">
         {navItems.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
+          <SidebarGroup key={group.title} className="px-2 py-1">
+            <SidebarGroupLabel className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-2 pb-1">
+              {group.title}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.url, item.exact)}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+              <SidebarMenu className="gap-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(item.url, item.exact);
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={item.title}
+                        className="h-9 rounded-lg px-3 text-sm font-medium"
+                      >
+                        <Link href={item.url} className="flex items-center gap-2.5">
+                          <item.icon className="size-4 shrink-0" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
+      {/* Footer — user menu */}
+      <SidebarFooter className="border-t border-border/60 py-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="h-10 rounded-lg px-2 data-[state=open]:bg-muted"
                 >
-                  <Avatar className="size-8 rounded-lg">
+                  <Avatar className="size-7 rounded-lg shrink-0">
                     <AvatarImage src="" alt="Admin" />
-                    <AvatarFallback className="rounded-lg">SA</AvatarFallback>
+                    <AvatarFallback className="rounded-lg bg-foreground text-background text-xs font-semibold">
+                      SA
+                    </AvatarFallback>
                   </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Admin</span>
-                    <span className="truncate text-xs text-muted-foreground">admin@saral.ai</span>
+                  <div className="grid flex-1 text-left text-sm leading-tight ml-1">
+                    <span className="truncate font-semibold text-sm">Admin</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      admin@saral.ai
+                    </span>
                   </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
+                  <ChevronsUpDown className="ml-auto size-3.5 text-muted-foreground" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-52 rounded-lg"
                 side="bottom"
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem>
-                  <User2 className="mr-2 size-4" />
+                <DropdownMenuItem className="gap-2">
+                  <User2 className="size-4 text-muted-foreground" />
                   Account
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <LogOut className="mr-2 size-4" />
+                <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive">
+                  <LogOut className="size-4" />
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>

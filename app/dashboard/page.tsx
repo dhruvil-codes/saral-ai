@@ -75,7 +75,7 @@ const callVolumeData = [
 const chartConfig = {
   calls: {
     label: "Calls",
-    color: "var(--chart-1)",
+    color: "oklch(0.55 0.15 250)",
   },
 } satisfies ChartConfig;
 
@@ -90,18 +90,25 @@ const recentCalls = [
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-4 py-4">
-      {/* Metric Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="flex flex-col gap-6">
+      {/* ── Metric Cards Row ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {metricCards.map((card) => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <card.icon className="size-4 text-muted-foreground" />
+          <Card
+            key={card.title}
+            className="dashboard-card border-0 rounded-xl"
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+              <CardTitle className="text-sm font-medium text-muted-foreground tracking-wide">
+                {card.title}
+              </CardTitle>
+              <div className="size-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                <card.icon className="size-4 text-muted-foreground" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+            <CardContent className="px-6 pb-6 pt-0">
+              <div className="metric-value">{card.value}</div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-2">
                 {card.trend === "up" && (
                   <TrendingUp className="size-3 text-emerald-500" />
                 )}
@@ -112,63 +119,91 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts + Table Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      {/* ── Chart + Recent Calls Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
         {/* Call Volume Chart */}
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Call Volume</CardTitle>
-            <CardDescription>Last 7 days of inbound calls</CardDescription>
+        <Card className="dashboard-card border-0 rounded-xl lg:col-span-4">
+          <CardHeader className="p-6 pb-4">
+            <CardTitle className="card-heading">Call Volume</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground mt-0.5">
+              Last 7 days of inbound calls
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+          <CardContent className="px-6 pb-6 pt-0">
+            <ChartContainer config={chartConfig} className="h-[260px] w-full">
               <BarChart accessibilityLayer data={callVolumeData}>
-                <CartesianGrid vertical={false} />
+                <CartesianGrid vertical={false} stroke="oklch(0.92 0 0)" />
                 <XAxis
                   dataKey="day"
                   tickLine={false}
                   tickMargin={10}
                   axisLine={false}
+                  tick={{ fontSize: 12, fill: "oklch(0.556 0 0)" }}
                 />
-                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tick={{ fontSize: 12, fill: "oklch(0.556 0 0)" }}
+                />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent indicator="dashed" />}
                 />
-                <Bar dataKey="calls" fill="var(--color-calls)" radius={4} />
+                <Bar
+                  dataKey="calls"
+                  fill="var(--color-calls)"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
 
         {/* Recent Calls Table */}
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Recent Calls</CardTitle>
-            <CardDescription>Latest 6 inbound calls</CardDescription>
+        <Card className="dashboard-card border-0 rounded-xl lg:col-span-3">
+          <CardHeader className="p-6 pb-4">
+            <CardTitle className="card-heading">Recent Calls</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground mt-0.5">
+              Latest 6 inbound calls
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-6 pb-6 pt-0">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Caller</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Duration</TableHead>
+                <TableRow className="border-b border-border/50 hover:bg-transparent">
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">
+                    Caller
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">
+                    Duration
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recentCalls.map((call, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium text-sm">{call.caller}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={call.status === "Completed" ? "default" : "secondary"}
-                        className="text-xs"
-                      >
-                        {call.status}
-                      </Badge>
+                  <TableRow
+                    key={i}
+                    className="border-b border-border/30 last:border-0"
+                  >
+                    <TableCell className="font-medium text-sm py-3">
+                      {call.caller}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
+                    <TableCell className="py-3">
+                      {call.status === "Completed" ? (
+                        <Badge className="text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 rounded-full px-2.5 py-0.5">
+                          {call.status}
+                        </Badge>
+                      ) : (
+                        <Badge className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-50 rounded-full px-2.5 py-0.5">
+                          {call.status}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground py-3">
                       {call.duration}
                     </TableCell>
                   </TableRow>

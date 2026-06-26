@@ -80,6 +80,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
             is_dummy = len(audio_bytes) < 100
             
             if is_container or is_dummy:
+                # Container formats / dummy chunks are handled immediately for compatibility.
+                # VAD gating does not apply here.
                 trigger_stt = True
                 audio_to_process = audio_bytes
                 buffering_overhead_ms = 0
@@ -87,18 +89,35 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 vad_detector.reset()
                 turn_start_time = None
             else:
-                # Process streaming PCM chunk with VAD
+                # Process streaming PCM chunk with VAD.
+                #
+                # Optimization (cost + latency):
+                # - Do NOT accumulate silent/noise frames in the STT buffer.
+                # - Only keep audio bytes after VAD flips into "speech_detected".
+                #
+                # Note: VoiceActivityDetector.process_chunk() appends into vad_detector.audio_buffer
+                # internally, so we prune/reset when we detect silence.
                 is_silence_detected = vad_detector.process_chunk(audio_bytes)
+
+                if not vad_detector.speech_detected:
+                    # Still in pre-speech region: drop this chunk locally to avoid STT costs.
+                    # Reset buffers, keep VAD state machine advancing.
+                    vad_detector.audio_buffer = bytearray()
+                else:
+                    # Speech is active; keep buffering until end-of-utterance.
+                    # (End-of-utterance is signaled by is_silence_detected.)
+                    pass
+
                 max_audio_limit_reached = len(vad_detector.audio_buffer) >= 480000  # ~15s safety limit
-                
+
                 if is_silence_detected or max_audio_limit_reached:
                     trigger_stt = True
                     audio_to_process = bytes(vad_detector.audio_buffer)
-                    
+
                     stt_trigger_time = time.perf_counter()
                     buffering_overhead_ms = int(round((stt_trigger_time - turn_start_time) * 1000))
                     silence_wait_ms = int(round(vad_detector.total_processed_ms - vad_detector.get_speech_end_time_ms()))
-                    
+
                     vad_detector.reset()
                     turn_start_time = None
                 else:
