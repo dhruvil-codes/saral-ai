@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import SmoothScroll from "../components/SmoothScroll";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Saral AI",
+  title: "Saral AI — Dashboard",
   description: "Voice AI for Indian Businesses",
 };
 
@@ -26,11 +26,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
-        <SmoothScroll>
+        <TooltipProvider>
           {children}
-        </SmoothScroll>
+        </TooltipProvider>
       </body>
     </html>
   );
 }
-

@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     VAD_CHANNELS: int = 1
     VAD_SAMPLE_WIDTH: int = 2
 
+    # VAD
+    SILERO_MODEL_PATH: str = ""
+
+    # Semantic Caching
+    SEMANTIC_CACHE_THRESHOLD: float = 0.85
+    SEMANTIC_CACHE_MAX_ENTRIES: int = 200
+
+    # RAG
+    RAG_TOP_N: int = 3
+    RAG_SIMILARITY_THRESHOLD: float = 0.70
+
     class Config:
         env_file = ".env"
         extra = "ignore"

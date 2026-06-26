@@ -1,249 +1,122 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  CheckCircle, 
-  Undo,
-  Bot
-} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search } from "lucide-react";
 
-// Mock Leads Data tailored for Indian MSMEs
-const initialLeads = [
-  { id: 1, name: "Priya Sharma", phone: "+91 98102 34567", intent: "Haircut & hair coloring appointment", urgency: "High", status: "New", date: "2026-06-25" },
-  { id: 2, name: "Rajesh Gupta", phone: "+91 99112 88344", intent: "Bridal makeup package pricing & queries", urgency: "Medium", status: "Contacted", date: "2026-06-24" },
-  { id: 3, name: "Amit Verma", phone: "+91 98711 02938", intent: "Commercial property site visit (Sector 62)", urgency: "High", status: "New", date: "2026-06-25" },
-  { id: 4, name: "Sneha Patel", phone: "+91 98122 88442", intent: "Keratin treatment appointment slots", urgency: "Low", status: "New", date: "2026-06-25" },
-  { id: 5, name: "Vikram Malhotra", phone: "+91 99991 23456", intent: "Annual VIP salon membership details", urgency: "Medium", status: "Contacted", date: "2026-06-23" },
-  { id: 6, name: "Divya Iyer", phone: "+91 98450 12345", intent: "Party makeup for 5 ladies on Saturday", urgency: "High", status: "New", date: "2026-06-25" },
-  { id: 7, name: "Sanjay Singh", phone: "+91 97118 77665", intent: "Full-body spa package booking", urgency: "Low", status: "Contacted", date: "2026-06-22" },
+const leads = [
+  { name: "Ananya Sharma", phone: "+91 98765 43210", intent: "Haircut", urgency: "High", status: "New" },
+  { name: "Ravi Patel", phone: "+91 87654 32109", intent: "Consultation", urgency: "Medium", status: "Contacted" },
+  { name: "Priya Mehta", phone: "+91 76543 21098", intent: "Appointment", urgency: "Low", status: "New" },
+  { name: "Arjun Singh", phone: "+91 65432 10987", intent: "Haircut", urgency: "High", status: "Contacted" },
+  { name: "Kavita Nair", phone: "+91 54321 09876", intent: "Coloring", urgency: "Medium", status: "New" },
+  { name: "Suresh Kumar", phone: "+91 43210 98765", intent: "Consultation", urgency: "Low", status: "Contacted" },
+  { name: "Deepa Reddy", phone: "+91 32109 87654", intent: "Appointment", urgency: "High", status: "New" },
+  { name: "Mohan Joshi", phone: "+91 21098 76543", intent: "Haircut", urgency: "Medium", status: "New" },
+  { name: "Lalitha Krishnan", phone: "+91 10987 65432", intent: "Consultation", urgency: "Low", status: "Contacted" },
+  { name: "Vikram Bose", phone: "+91 09876 54321", intent: "Coloring", urgency: "High", status: "New" },
 ];
 
+const urgencyVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  High: "destructive",
+  Medium: "default",
+  Low: "secondary",
+};
+
+const statusVariant: Record<string, "default" | "secondary" | "outline"> = {
+  New: "default",
+  Contacted: "secondary",
+};
+
 export default function LeadsPage() {
-  const [leads, setLeads] = useState(initialLeads);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [urgencyFilter, setUrgencyFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [search, setSearch] = useState("");
 
-  // Toggle lead contacted status
-  const toggleStatus = (id: number) => {
-    setLeads(leads.map(lead => {
-      if (lead.id === id) {
-        return {
-          ...lead,
-          status: lead.status === "New" ? "Contacted" : "New"
-        };
-      }
-      return lead;
-    }));
-  };
-
-  // Filter logic
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = 
-      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone.includes(searchTerm) ||
-      lead.intent.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesUrgency = urgencyFilter === "All" || lead.urgency === urgencyFilter;
-    const matchesStatus = statusFilter === "All" || lead.status === statusFilter;
-
-    return matchesSearch && matchesUrgency && matchesStatus;
-  });
-
-  const getUrgencyBadge = (urgency: string) => {
-    switch (urgency) {
-      case "High":
-        return (
-          <span className="inline-block bg-[var(--color-accent-light)] text-[#92400e] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            High
-          </span>
-        );
-      case "Medium":
-        return (
-          <span className="inline-block bg-purple-50 text-purple-700 border border-purple-100 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            Medium
-          </span>
-        );
-      case "Low":
-        return (
-          <span className="inline-block bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            Low
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "New":
-        return (
-          <span className="inline-block bg-sky-50 text-sky-700 border border-sky-100 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            New
-          </span>
-        );
-      case "Contacted":
-        return (
-          <span className="inline-block bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            Contacted
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
+  const filtered = leads.filter(
+    (l) =>
+      l.name.toLowerCase().includes(search.toLowerCase()) ||
+      l.phone.includes(search) ||
+      l.intent.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="space-y-8 font-sans">
-      {/* View Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            Captured Leads
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Review qualified business opportunities transcripted and classified by AI.
-          </p>
-        </div>
-
-        {/* Primary/Secondary action button - Pill shaped */}
-        <button
-          onClick={() => alert("Leads exported to CSV format!")}
-          className="inline-flex items-center gap-2 border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-primary)] font-semibold rounded-full px-5 py-2 hover:border-[var(--color-text-primary)] transition-all text-xs cursor-pointer"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export CSV</span>
-        </button>
-      </div>
-
-      {/* Filters Toolbar - Card structure */}
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.03)] space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 justify-between">
-          
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
-            <input
-              type="text"
-              placeholder="Search by Name, Phone, or Intent..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-full pl-10 pr-4 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors font-sans"
-            />
-          </div>
-
-          {/* Quick Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-xs">
-              <Filter className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
-              <span className="font-semibold text-[var(--color-text-secondary)]">Urgency:</span>
-              <select
-                value={urgencyFilter}
-                onChange={(e) => setUrgencyFilter(e.target.value)}
-                className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-full px-3 py-1 font-semibold text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
-              >
-                <option value="All">All</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold text-[var(--color-text-secondary)]">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-full px-3 py-1 font-semibold text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
-              >
-                <option value="All">All</option>
-                <option value="New">New</option>
-                <option value="Contacted">Contacted</option>
-              </select>
+    <div className="flex flex-col gap-4 py-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Leads</CardTitle>
+          <CardDescription>
+            {leads.length} total leads captured from voice calls
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Search leads..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Leads Table Container */}
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] shadow-[0_2px_8px_rgba(0,0,0,0.03)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)] font-bold text-xs uppercase tracking-wider font-sans">
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Phone Number</th>
-                <th className="px-6 py-4">Qualified Intent</th>
-                <th className="px-6 py-4 text-center">Urgency</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border)] text-sm text-[var(--color-text-primary)]">
-              {filteredLeads.length > 0 ? (
-                filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-[var(--color-surface-alt)]/50 transition-colors">
-                    <td className="px-6 py-4 font-bold">{lead.name}</td>
-                    <td className="px-6 py-4 font-mono text-xs">{lead.phone}</td>
-                    <td className="px-6 py-4 max-w-xs truncate text-[var(--color-text-secondary)]" title={lead.intent}>
-                      {lead.intent}
-                    </td>
-                    <td className="px-6 py-4 text-center">{getUrgencyBadge(lead.urgency)}</td>
-                    <td className="px-6 py-4 text-center">{getStatusBadge(lead.status)}</td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => toggleStatus(lead.id)}
-                        className={`inline-flex items-center gap-1 text-xs font-bold px-3.5 py-1.5 rounded-full border transition-all cursor-pointer ${
-                          lead.status === "New"
-                            ? "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300"
-                            : "border-[var(--color-border-strong)] text-[var(--color-text-secondary)] bg-transparent hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
-                        }`}
-                      >
-                        {lead.status === "New" ? (
-                          <>
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            <span>Mark Contacted</span>
-                          </>
-                        ) : (
-                          <>
-                            <Undo className="w-3.5 h-3.5" />
-                            <span>Mark New</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-[var(--color-text-muted)]">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Bot className="w-8 h-8 text-[var(--color-text-muted)] animate-pulse" />
-                      <p className="font-semibold text-sm">No leads match the filters.</p>
-                      <p className="text-xs">Try clearing the search or changing parameters.</p>
-                    </div>
-                  </td>
-                </tr>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone Number</TableHead>
+                <TableHead>Intent</TableHead>
+                <TableHead>Urgency</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((lead) => (
+                <TableRow key={lead.phone}>
+                  <TableCell className="font-medium">{lead.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{lead.phone}</TableCell>
+                  <TableCell>{lead.intent}</TableCell>
+                  <TableCell>
+                    <Badge variant={urgencyVariant[lead.urgency]} className="text-xs">
+                      {lead.urgency}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant[lead.status]} className="text-xs">
+                      {lead.status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No leads found.
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer stats bar */}
-        <div className="px-6 py-4 border-t border-[var(--color-border)] bg-[var(--color-surface-alt)] flex justify-between items-center text-xs text-[var(--color-text-secondary)] font-sans">
-          <div>
-            Showing <strong className="text-[var(--color-text-primary)]">{filteredLeads.length}</strong> of{" "}
-            <strong className="text-[var(--color-text-primary)]">{leads.length}</strong> total qualified leads
-          </div>
-          <div>
-            AI Filter Active
-          </div>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

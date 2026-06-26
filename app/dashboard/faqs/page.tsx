@@ -1,275 +1,327 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  Plus, 
-  Search, 
-  Trash2, 
-  BookOpen, 
-  Check, 
-  HelpCircle,
-  Tag
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
-// Mock Q&As
-const initialFaqs = [
-  { id: 1, question: "What are your opening hours?", answer: "We are open from 9:30 AM to 8:30 PM, Monday through Sunday. Last appointment is taken at 8:00 PM.", category: "Timings" },
-  { id: 2, question: "Where is your salon located?", answer: "We are located at Shop No. 12, Block C, Main Market, Sector 62, Noida, Uttar Pradesh (Near HDFC Bank).", category: "Location" },
-  { id: 3, question: "Do you provide haircut services for men?", answer: "Yes, we provide styling and haircut services for both men and women. Haircuts start at ₹250 for men and ₹500 for women.", category: "Services" },
-  { id: 4, question: "What is the cost of Keratin treatment?", answer: "Keratin treatment starts at ₹3,999 for shoulder-length hair. Price may vary depending on hair length and volume. AI can book a free consultation call for exact pricing.", category: "Pricing" },
-  { id: 5, question: "Do you accept digital payments and UPI?", answer: "Yes! We accept all major credit/debit cards, Google Pay, PhonePe, Paytm, and cash.", category: "Billing" },
+type FAQ = {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+};
+
+const initialFaqs: FAQ[] = [
+  {
+    id: "1",
+    question: "What are your working hours?",
+    answer: "We are open Monday to Saturday from 9 AM to 8 PM, and Sunday from 10 AM to 6 PM.",
+    category: "Hours",
+  },
+  {
+    id: "2",
+    question: "How do I book an appointment?",
+    answer: "You can book an appointment by calling our AI assistant, visiting our website, or asking during a call. The AI can directly schedule you.",
+    category: "Booking",
+  },
+  {
+    id: "3",
+    question: "What services do you offer?",
+    answer: "We offer haircuts, coloring, highlights, balayage, straightening, perming, and various spa treatments.",
+    category: "Services",
+  },
+  {
+    id: "4",
+    question: "Do you offer home service?",
+    answer: "Yes, we offer home service for select services within a 10 km radius. Additional charges apply.",
+    category: "Services",
+  },
+  {
+    id: "5",
+    question: "What is your cancellation policy?",
+    answer: "You can cancel or reschedule up to 2 hours before your appointment without any charge. Late cancellations may incur a small fee.",
+    category: "Policy",
+  },
 ];
 
-const categories = ["All", "Services", "Pricing", "Timings", "Location", "Billing"];
+const categoryColors: Record<string, "default" | "secondary" | "outline"> = {
+  Hours: "default",
+  Booking: "secondary",
+  Services: "outline",
+  Policy: "secondary",
+};
 
 export default function FaqsPage() {
-  const [faqs, setFaqs] = useState(initialFaqs);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newQuestion, setNewQuestion] = useState("");
-  const [newAnswer, setNewAnswer] = useState("");
-  const [newCategory, setNewCategory] = useState("Services");
-  const [toastMessage, setToastMessage] = useState("");
+  const [faqs, setFaqs] = useState<FAQ[]>(initialFaqs);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
+  const [form, setForm] = useState({ question: "", answer: "", category: "" });
 
-  const handleAddFaq = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newQuestion.trim() || !newAnswer.trim()) return;
-
-    const newFaq = {
-      id: Date.now(),
-      question: newQuestion,
-      answer: newAnswer,
-      category: newCategory,
+  const handleAdd = () => {
+    if (!form.question || !form.answer) return;
+    const newFaq: FAQ = {
+      id: Date.now().toString(),
+      question: form.question,
+      answer: form.answer,
+      category: form.category || "General",
     };
-
-    setFaqs([newFaq, ...faqs]);
-    setNewQuestion("");
-    setNewAnswer("");
-    setIsModalOpen(false);
-
-    // Show toast
-    setToastMessage("FAQ added successfully!");
-    setTimeout(() => setToastMessage(""), 3000);
+    setFaqs([...faqs, newFaq]);
+    setForm({ question: "", answer: "", category: "" });
+    setIsAddOpen(false);
   };
 
-  const handleDeleteFaq = (id: number) => {
-    if (confirm("Are you sure you want to delete this FAQ?")) {
-      setFaqs(faqs.filter(faq => faq.id !== id));
-      setToastMessage("FAQ deleted successfully!");
-      setTimeout(() => setToastMessage(""), 3000);
-    }
+  const handleEdit = () => {
+    if (!editingFaq || !form.question || !form.answer) return;
+    setFaqs(
+      faqs.map((f) =>
+        f.id === editingFaq.id
+          ? { ...f, question: form.question, answer: form.answer, category: form.category }
+          : f
+      )
+    );
+    setEditingFaq(null);
+    setForm({ question: "", answer: "", category: "" });
   };
 
-  // Filter logic
-  const filteredFaqs = faqs.filter(faq => {
-    const matchesSearch = 
-      faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = selectedCategory === "All" || faq.category === selectedCategory;
+  const handleDelete = (id: string) => {
+    setFaqs(faqs.filter((f) => f.id !== id));
+  };
 
-    return matchesSearch && matchesCategory;
-  });
+  const openEdit = (faq: FAQ) => {
+    setEditingFaq(faq);
+    setForm({ question: faq.question, answer: faq.answer, category: faq.category });
+  };
 
   return (
-    <div className="space-y-8 font-sans relative">
-      
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[var(--color-text-primary)] text-white text-xs font-bold px-4 py-3 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
-          <Check className="w-4 h-4 text-emerald-400" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            AI Knowledge Base
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Define custom Q&As so the Voice AI agent knows how to answer customer queries.
-          </p>
-        </div>
-
-        {/* Primary CTA (Pill-shaped, yellow bg, dark text, exactly one per viewport) */}
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center gap-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-primary)] font-bold px-6 py-2.5 rounded-full shadow-[0_2px_8px_rgba(245,166,35,0.25)] transition-all transform hover:-translate-y-0.5 active:scale-98 text-sm cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Q&A</span>
-        </button>
-      </div>
-
-      {/* Toolbar & Category Filters */}
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.03)] space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          {/* Search */}
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
-            <input
-              type="text"
-              placeholder="Search existing Q&As..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-full pl-10 pr-4 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors font-sans"
-            />
+    <div className="flex flex-col gap-4 py-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Knowledge Base</CardTitle>
+            <CardDescription>
+              Manage FAQs that your AI voice assistant uses to answer callers
+            </CardDescription>
           </div>
-
-          {/* Category Badges list */}
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer",
-                  selectedCategory === cat
-                    ? "bg-[var(--color-accent-light)] border-transparent text-[#92400e]"
-                    : "bg-transparent border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-text-primary)]"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* FAQs List Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredFaqs.length > 0 ? (
-          filteredFaqs.map((faq) => (
-            <div 
-              key={faq.id}
-              className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-shadow relative group"
-            >
-              <div>
-                <div className="flex justify-between items-start gap-4 mb-3">
-                  <span className="inline-flex items-center gap-1 bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                    <Tag className="w-2.5 h-2.5 text-[var(--color-text-muted)]" />
-                    {faq.category}
-                  </span>
-                  
-                  {/* Delete Action button */}
-                  <button
-                    onClick={() => handleDeleteFaq(faq.id)}
-                    className="p-1 rounded-full text-[var(--color-text-muted)] hover:text-rose-600 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
-                    title="Delete Q&A"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="mr-2 size-4" />
+                Add New
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Add FAQ</DialogTitle>
+                <DialogDescription>
+                  Add a new question and answer pair to your knowledge base.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="add-question">Question</Label>
+                  <Input
+                    id="add-question"
+                    placeholder="What is your question?"
+                    value={form.question}
+                    onChange={(e) => setForm({ ...form, question: e.target.value })}
+                  />
                 </div>
-
-                <h4 className="text-sm font-bold text-[var(--color-text-primary)] flex items-start gap-2 mb-2">
-                  <HelpCircle className="w-4 h-4 text-[var(--color-accent)] shrink-0 mt-0.5" />
-                  <span>{faq.question}</span>
-                </h4>
-                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed pl-6">
-                  {faq.answer}
-                </p>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="add-answer">Answer</Label>
+                  <Textarea
+                    id="add-answer"
+                    placeholder="Provide a clear, concise answer..."
+                    rows={4}
+                    value={form.answer}
+                    onChange={(e) => setForm({ ...form, answer: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="add-category">Category</Label>
+                  <Input
+                    id="add-category"
+                    placeholder="e.g. Booking, Services, Policy"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  />
+                </div>
               </div>
-            </div>
-          ))
-        ) : (
-          <div className="col-span-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] p-12 text-center text-[var(--color-text-muted)] flex flex-col items-center justify-center gap-2">
-            <BookOpen className="w-8 h-8 text-[var(--color-text-muted)] animate-pulse" />
-            <p className="font-semibold text-sm">No Q&As found.</p>
-            <p className="text-xs">Add a custom Q&A to train your AI agent.</p>
-          </div>
-        )}
-      </div>
-
-      {/* ADD FAQ MODAL DIALOG */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/40 transition-opacity duration-300"
-            onClick={() => setIsModalOpen(false)}
-          />
-
-          {/* Dialog Card Box (rounded.xl/24px card) */}
-          <div className="relative w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] shadow-2xl p-6 z-10 mx-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center pb-4 border-b border-[var(--color-border)] mb-4">
-              <h3 className="text-base font-bold text-[var(--color-text-primary)] font-sans">
-                Add Q&A to Knowledge Base
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-full hover:bg-[var(--color-surface-alt)] text-[var(--color-text-secondary)] transition-colors cursor-pointer"
-              >
-                <Plus className="w-5 h-5 rotate-45" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddFaq} className="space-y-4 text-xs">
-              {/* Category Select */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-[var(--color-text-secondary)] uppercase">Category</label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
-                >
-                  {categories.filter(c => c !== "All").map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Question Input */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-[var(--color-text-secondary)] uppercase">Question</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Do you have parking space available?"
-                  value={newQuestion}
-                  onChange={(e) => setNewQuestion(e.target.value)}
-                  className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] font-sans"
-                />
-              </div>
-
-              {/* Answer Textarea */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-[var(--color-text-secondary)] uppercase">AI Response Answer</label>
-                <textarea
-                  required
-                  rows={4}
-                  placeholder="e.g. Yes, we have free valet parking available for all clients right in front of the salon."
-                  value={newAnswer}
-                  onChange={(e) => setNewAnswer(e.target.value)}
-                  className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] resize-none font-sans"
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex justify-end gap-3 pt-3 border-t border-[var(--color-border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2 border border-[var(--color-border-strong)] text-[var(--color-text-primary)] font-semibold rounded-full hover:bg-[var(--color-surface-alt)] transition-colors cursor-pointer"
-                >
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddOpen(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-primary)] font-bold px-5 py-2 rounded-full shadow-sm transition-colors cursor-pointer"
-                >
-                  Save FAQ
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                </Button>
+                <Button onClick={handleAdd}>Add FAQ</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Question</TableHead>
+                <TableHead>Answer</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {faqs.map((faq) => (
+                <TableRow key={faq.id}>
+                  <TableCell className="font-medium max-w-[200px]">
+                    <span className="truncate block">{faq.question}</span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground max-w-[280px]">
+                    <span className="line-clamp-2">{faq.answer}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={categoryColors[faq.category] ?? "outline"} className="text-xs">
+                      {faq.category}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {/* Edit Dialog */}
+                      <Dialog
+                        open={editingFaq?.id === faq.id}
+                        onOpenChange={(open) => !open && setEditingFaq(null)}
+                      >
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            onClick={() => openEdit(faq)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                          <DialogHeader>
+                            <DialogTitle>Edit FAQ</DialogTitle>
+                            <DialogDescription>
+                              Update the question and answer.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex flex-col gap-4 py-4">
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="edit-question">Question</Label>
+                              <Input
+                                id="edit-question"
+                                value={form.question}
+                                onChange={(e) =>
+                                  setForm({ ...form, question: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="edit-answer">Answer</Label>
+                              <Textarea
+                                id="edit-answer"
+                                rows={4}
+                                value={form.answer}
+                                onChange={(e) =>
+                                  setForm({ ...form, answer: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <Label htmlFor="edit-category">Category</Label>
+                              <Input
+                                id="edit-category"
+                                value={form.category}
+                                onChange={(e) =>
+                                  setForm({ ...form, category: e.target.value })
+                                }
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setEditingFaq(null)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={handleEdit}>Save Changes</Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
+                      {/* Delete AlertDialog */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete FAQ?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove this FAQ from your knowledge base.
+                              Your AI assistant will no longer be able to answer this question.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(faq.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
