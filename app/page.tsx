@@ -10,6 +10,7 @@ import {
 } from "../components/LineArt";
 import ProblemFeatures from "../components/ui/problem-features";
 import { Megaphone, Clock, UserX } from "lucide-react";
+import Footer from "../components/Footer";
 
 export default function Home() {
   return (
@@ -307,43 +308,8 @@ export default function Home() {
 
 
 
-      {/* 6. Footer (bg: --color-dark-bg) */}
-      <footer className="bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] py-16 md:py-20">
-        <div className="max-w-[1160px] mx-auto px-4 md:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-8 border-b border-zinc-800 pb-12">
-            
-            <div className="max-w-xs">
-              <a href="#" className="font-display text-2xl font-bold tracking-tight text-white hover:opacity-90 transition-opacity block mb-3">
-                Saral AI
-              </a>
-              <p className="text-sm text-zinc-400">
-                Simple, automated voice intelligence designed for the next billion users and businesses across India.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-12 md:gap-16">
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-bold tracking-wider text-zinc-500 uppercase">Product</span>
-                <a href="#problem" className="text-sm text-zinc-400 hover:text-white transition-colors">Why Saral AI</a>
-                <a href="#stats" className="text-sm text-zinc-400 hover:text-white transition-colors">Impact stats</a>
-                <a href="#how-it-works" className="text-sm text-zinc-400 hover:text-white transition-colors">How It Works</a>
-              </div>
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-bold tracking-wider text-zinc-500 uppercase">Company</span>
-                <a href="#" className="text-sm text-zinc-400 hover:text-white transition-colors">About Us</a>
-                <a href="#" className="text-sm text-zinc-400 hover:text-white transition-colors">Contact Support</a>
-                <a href="#" className="text-sm text-zinc-400 hover:text-white transition-colors">Privacy Policy</a>
-              </div>
-            </div>
-
-          </div>
-
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 text-xs text-zinc-500">
-            <span>© 2026 Saral AI. All rights reserved.</span>
-            <span>Made with precision for Indian businesses.</span>
-          </div>
-        </div>
-      </footer>
+      {/* 6. Footer */}
+      <Footer />
     </main>
   );
 }
