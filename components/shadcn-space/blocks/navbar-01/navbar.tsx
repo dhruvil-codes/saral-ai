@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
+import { SaralLogoMark } from "@/assets/logo/logo";
 import { ArrowUpRight, TextAlignJustify } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -23,27 +24,14 @@ const SaralLogo = ({ sticky }: { sticky: boolean }) => (
   <a
     href="#"
     className={cn(
-      "flex items-center gap-2 font-display text-2xl font-bold tracking-tight transition-colors duration-300 hover:opacity-90",
+      "flex items-center gap-2.5 font-display text-2xl font-bold tracking-tight transition-colors duration-300 hover:opacity-90",
       sticky ? "text-[var(--color-text-primary)]" : "text-white"
     )}
   >
-    <svg
-      width="26"
-      height="36"
-      viewBox="0 0 26 36"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn("transition-colors duration-300", sticky ? "text-[var(--color-text-primary)]" : "text-white")}
-    >
-      <path
-        d="m7.25 10.86 6 3.366 6-3.367m-12 20.176v-6.721l-6-3.367m24 0-6 3.367v6.72M1.61 14.42l11.64 6.54 11.64-6.54M13.25 34V20.947m12 5.18v-10.36c0-.454-.124-.9-.358-1.293a2.63 2.63 0 0 0-.975-.947l-9.333-5.18a2.73 2.73 0 0 0-2.667 0l-9.333 5.18a2.63 2.63 0 0 0-.976.947 2.54 2.54 0 0 0-.358 1.293v10.36c0 .454.124.9.358 1.293s.57.72.976.947l9.333 5.18a2.73 2.73 0 0 0 2.667 0l9.333-5.18a2.63 2.63 0 0 0 .975-.947 2.53 2.53 0 0 0 .358-1.293"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-    <span>Saral AI</span>
+    <SaralLogoMark size={32} fill={sticky ? "#000000" : "#ffffff"} />
+    <span style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>
+      Saral AI
+    </span>
   </a>
 );
 
@@ -63,6 +51,9 @@ const GetStartedButton = ({ className }: { className?: string }) => (
 const Navbar = () => {
   const [sticky, setSticky] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState("Products");
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+
   const handleScroll = useCallback(() => {
     setSticky(window.scrollY >= 50);
   }, []);
@@ -81,6 +72,8 @@ const Navbar = () => {
     };
   }, [handleScroll, handleResize]);
 
+  const currentSpotlight = hoveredNav ?? activeNav;
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-transparent transition-all duration-300 w-full py-4">
       <div className="max-w-[1160px] mx-auto w-full px-4 md:px-8">
@@ -95,25 +88,27 @@ const Navbar = () => {
           <SaralLogo sticky={sticky} />
 
           <div>
-            <NavigationMenu className={cn("max-lg:hidden p-0.5 rounded-full border transition-colors duration-300", 
-              sticky ? "bg-[var(--color-surface-alt)] border-[var(--color-border)]" : "bg-white/10 border-white/10 backdrop-blur-xs"
+            <NavigationMenu className={cn("max-lg:hidden p-0.5 rounded-full transition-colors duration-300 border-0", 
+              sticky ? "bg-[var(--color-surface-alt)]" : "bg-white/10 backdrop-blur-xs"
             )}>
-              <NavigationMenuList className="flex gap-0">
+              <NavigationMenuList className="flex gap-0" onMouseLeave={() => setHoveredNav(null)}>
                 {navigationData.map((navItem) => {
-                  const isActive = navItem.title === "Products";
+                  const isSpotlight = navItem.title === currentSpotlight;
                   return (
                     <NavigationMenuItem key={navItem.title}>
                       <NavigationMenuLink
                         href={navItem.href}
+                        onMouseEnter={() => setHoveredNav(navItem.title)}
+                        onClick={() => setActiveNav(navItem.title)}
                         className={cn(
-                          "px-4 py-1.5 text-sm font-medium rounded-full transition duration-300 tracking-normal border cursor-pointer",
-                          isActive 
+                          "px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-300 tracking-normal cursor-pointer border-0 select-none",
+                          isSpotlight 
                             ? (sticky 
-                              ? "bg-[var(--color-surface)] text-[var(--color-text-primary)] border-[var(--color-border)] shadow-xs" 
-                              : "bg-white text-[var(--color-text-primary)] border-white shadow-xs")
+                              ? "bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-xs" 
+                              : "bg-white text-[#1a1a1a] shadow-xs")
                             : (sticky 
-                              ? "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] hover:border-[var(--color-border)] border-transparent" 
-                              : "text-white/80 hover:text-white hover:bg-white/10 hover:border-white/10 border-transparent")
+                              ? "bg-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]" 
+                              : "bg-transparent text-white/80 hover:text-white")
                         )}
                       >
                         {navItem.title}
