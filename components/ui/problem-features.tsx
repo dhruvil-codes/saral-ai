@@ -35,16 +35,16 @@ function FeatureCard({ feature }: { feature: Feature }) {
     <motion.div
       ref={cardRef}
       className={cn(
-        "relative overflow-hidden rounded-[20px] border border-[var(--color-border)]",
-        "bg-[var(--color-surface)] p-8 flex flex-col gap-5 cursor-default"
+        "relative overflow-hidden rounded-[26px] border border-[#f7f7f7]",
+        "bg-[#ffffff] p-8 flex flex-col gap-5 cursor-default shadow-[0px_0px_0px_5px_#f7f7f7]"
       )}
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       whileHover={{
         boxShadow:
-          "0 8px 32px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05)",
-        y: -4,
+          "rgb(247, 247, 247) 0px 0px 0px 5px",
+        y: -2,
       }}
       transition={{ duration: 0.22, ease: "easeOut" }}
     >
@@ -62,21 +62,21 @@ function FeatureCard({ feature }: { feature: Feature }) {
         className="absolute inset-x-0 top-0 h-px"
         animate={{
           background: isHovered
-            ? "linear-gradient(90deg, transparent 0%, var(--color-accent) 50%, transparent 100%)"
-            : "linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)",
+            ? "linear-gradient(90deg, transparent 0%, #f5a623 50%, transparent 100%)"
+            : "linear-gradient(90deg, transparent 0%, #f7f7f7 50%, transparent 100%)",
         }}
         transition={{ duration: 0.3 }}
       />
 
       {/* Icon circle */}
-      <div className="relative z-10 w-12 h-12 rounded-full bg-[var(--color-accent-light)] flex items-center justify-center text-[var(--color-accent)] flex-shrink-0">
+      <div className="relative z-10 w-12 h-12 rounded-full bg-[rgba(245,166,35,0.08)] flex items-center justify-center text-[#f5a623] flex-shrink-0">
         {feature.icon}
       </div>
 
       {/* Title */}
       <div className="relative z-10 flex flex-col gap-2">
         <h3
-          className="text-[1.25rem] font-bold tracking-tight text-[var(--color-text-primary)] leading-snug"
+          className="text-[1.25rem] font-bold tracking-tight text-[#000000] leading-snug"
           style={{
             fontFamily:
               "var(--font-garamond), 'ITC Garamond Book Narrow', Georgia, serif",
@@ -86,7 +86,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
         </h3>
         {/* Description */}
         <p
-          className="text-sm leading-relaxed text-[var(--color-text-secondary)]"
+          className="text-sm leading-relaxed text-[#3e3e3e]"
           style={{
             fontFamily: "var(--font-geist-sans), Inter, ui-sans-serif, sans-serif",
           }}
