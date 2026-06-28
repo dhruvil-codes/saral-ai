@@ -2,7 +2,6 @@
 
 import ScrollObserver from "../components/ScrollObserver";
 import Navbar from "../components/shadcn-space/blocks/navbar-01/navbar";
-import BentoGrid from "../components/kokonutui/bento-grid";
 import {
   StepCallIllustration,
   StepAnswerIllustration,
@@ -10,6 +9,7 @@ import {
 } from "../components/LineArt";
 import ProblemFeatures from "../components/ui/problem-features";
 import { Megaphone, Clock, UserX } from "lucide-react";
+import FeatureGrid from "../components/FeatureGrid";
 import Footer from "../components/Footer";
 
 export default function Home() {
@@ -77,7 +77,7 @@ export default function Home() {
           </p>
           
           {/* Browser Mockup Card */}
-          <div className="w-full max-w-[900px] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] shadow-[0_12px_24px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300">
+          <div className="w-full max-w-[900px] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[24px] shadow-[0_12px_24px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 relative z-30">
             {/* Browser Chrome Header */}
             <div className="bg-[var(--color-surface-alt)] px-4 py-3 border-b border-[var(--color-border)] flex items-center">
               <div className="flex gap-1.5">
@@ -162,12 +162,15 @@ export default function Home() {
           </div>
           
         </div>
+
+        {/* Soft gradient overlay blending hero sky image into problem section */}
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent via-[var(--color-surface-alt)]/70 to-[var(--color-surface-alt)] pointer-events-none z-0" />
       </section>
 
       {/* 3. Problem Section (bg: --color-surface-alt) */}
       <section id="problem" className="py-16 md:py-24 bg-[var(--color-surface-alt)] border-b border-[var(--color-border)] relative">
         <div className="max-w-[1160px] mx-auto px-4 md:px-8">
-          <div className="text-center max-w-[640px] mx-auto mb-16 reveal">
+          <div className="text-center max-w-[640px] mx-auto mb-16">
             <span className="t-label text-[var(--color-accent)] mb-3 block tracking-widest font-semibold">
               THE PROBLEM
             </span>
@@ -202,111 +205,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. Stats Bar (bg: --color-bg) */}
-      <section id="stats" className="py-16 md:py-24 bg-[var(--color-bg)]">
-        <div className="max-w-[1160px] mx-auto px-4 md:px-8 reveal">
-          <BentoGrid />
-        </div>
-      </section>
-
-      {/* Wave Divider 3: Transitioning from Stats Bar (--color-bg) to How It Works (--color-surface-alt) */}
-      <div className="w-full bg-[var(--color-bg)]">
-        <svg className="w-full h-8 block" viewBox="0 0 1200 120" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,20 C400,100 800,0 1200,80 L1200,120 L0,120 Z" fill="var(--color-surface-alt)" />
-        </svg>
-      </div>
-
-      {/* 5. How It Works Section (bg: --color-surface-alt, shares transition with Stats Bar) */}
-      <section id="how-it-works" className="py-16 md:py-24 bg-[var(--color-surface-alt)] border-t border-[var(--color-border)]">
-        <div className="max-w-[1160px] mx-auto px-4 md:px-8">
-          <div className="text-center max-w-[640px] mx-auto mb-16 reveal">
-            <span className="t-label text-[var(--color-accent)] mb-3 block">
-              How It Works
-            </span>
-            <h2 className="t-section-heading text-[var(--color-text-primary)] mb-4">
-              Three simple steps to zero missed leads
-            </h2>
-            <p className="t-body-lead text-[var(--color-text-secondary)]">
-              Set up your voice intelligence channel on autopilot and capture every inbound query instantly.
-            </p>
-          </div>
-
-          {/* Steps Horizontal / Vertical Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 reveal-stagger relative">
-            
-            {/* Step 1 */}
-            <div className="flex flex-col items-center text-center gap-5 relative">
-              <span className="font-display italic text-6xl md:text-7xl text-[var(--color-accent)] font-semibold select-none leading-none">
-                1
-              </span>
-              <div className="p-4 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)] flex items-center justify-center">
-                <StepCallIllustration size={40} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)] mb-2">
-                  Customer calls your number
-                </h3>
-                <p className="t-body text-sm text-[var(--color-text-secondary)] px-4 leading-relaxed">
-                  They dial your business number. No confusing IVR paths, no holding queues — the call connects instantly.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex flex-col items-center text-center gap-5 relative">
-              <span className="font-display italic text-6xl md:text-7xl text-[var(--color-accent)] font-semibold select-none leading-none">
-                2
-              </span>
-              <div className="p-4 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)] flex items-center justify-center">
-                <StepAnswerIllustration size={40} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)] mb-2">
-                  Saral AI answers
-                </h3>
-                <p className="t-body text-sm text-[var(--color-text-secondary)] px-4 leading-relaxed">
-                  Our voice agent responds in Hindi, Hinglish, or English, answering queries and qualifying details.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex flex-col items-center text-center gap-5 relative">
-              <span className="font-display italic text-6xl md:text-7xl text-[var(--color-accent)] font-semibold select-none leading-none">
-                3
-              </span>
-              <div className="p-4 bg-[var(--color-accent-light)] rounded-full text-[var(--color-accent)] flex items-center justify-center">
-                <StepSummaryIllustration size={40} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold font-sans text-[var(--color-text-primary)] mb-2">
-                  Get a WhatsApp summary
-                </h3>
-                <p className="t-body text-sm text-[var(--color-text-secondary)] px-4 leading-relaxed">
-                  Receive structured lead details, urgency levels, and caller sentiment directly to your phone.
-                </p>
-              </div>
-            </div>
-            
-          </div>
-
-          {/* Centered CTA Trigger Block */}
-          <div id="get-started" className="mt-20 text-center reveal">
-            {/* Primary CTA (amber, pill-shaped, 1 per viewport) */}
-            <a 
-              href="/login"
-              className="inline-block bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-primary)] font-semibold rounded-full px-8 py-4 shadow-[0_4px_16px_rgba(245,166,35,0.35)] transition-all transform hover:-translate-y-0.5 active:scale-98 text-base cursor-pointer"
-            >
-              Get Started Free
-            </a>
-            <p className="text-xs text-[var(--color-text-muted)] mt-3">
-              No credit card required. Launch your first voice campaign in 15 minutes.
-            </p>
-          </div>
-        </div>
-      </section>
-
-
+      {/* 4. Core Architecture Features Grid */}
+      <FeatureGrid />
 
       {/* 6. Footer */}
       <Footer />
