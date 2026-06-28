@@ -8,11 +8,11 @@ import {
   Phone,
   BookOpen,
   Settings,
-  Bot,
   LogOut,
   ChevronsUpDown,
   User2,
 } from "lucide-react";
+import { SaralLogoMark } from "@/assets/logo/logo";
 
 import {
   Sidebar,
@@ -88,13 +88,11 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-border/60 py-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild className="h-12 rounded-lg px-2 text-[#555555] bg-transparent hover:bg-[#f5a623] hover:text-black transition-colors duration-150">
               <Link href="/dashboard" className="flex items-center gap-2.5">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
-                  <Bot className="size-4" />
-                </div>
+                <SaralLogoMark size={28} fill="#000000" className="shrink-0" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold tracking-tight">
+                  <span className="truncate font-semibold tracking-tight text-base" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>
                     Saral AI
                   </span>
                   <span className="truncate text-xs text-muted-foreground">
@@ -124,7 +122,7 @@ export function AppSidebar() {
                         asChild
                         isActive={active}
                         tooltip={item.title}
-                        className="h-9 rounded-lg px-3 text-sm font-medium"
+                        className="h-9 rounded-lg px-3 text-sm font-medium text-[#555555] bg-transparent hover:bg-[#f5a623] hover:text-black data-[active=true]:bg-transparent data-[active=true]:text-[#555555] data-[active=true]:hover:bg-[#f5a623] data-[active=true]:hover:text-black transition-colors duration-150"
                       >
                         <Link href={item.url} className="flex items-center gap-2.5">
                           <item.icon className="size-4 shrink-0" />
