@@ -168,26 +168,26 @@ body {
    Landing Page Design System Tokens
 ───────────────────────────────────────── */
 .landing-page {
-  /* Brand Color Palette */
-  --color-bg: #f5f5f0;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f0f0ea;
+  /* Portal — Color Palette */
+  --color-bg: #f7f7f7;           /* Ash Mist page canvas */
+  --color-surface: #ffffff;       /* Paper White card surface */
+  --color-surface-alt: #f7f7f7;   /* Ash Mist alternate sections */
   
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #555555;
-  --color-text-muted: #888888;
+  --color-text-primary: #000000;  /* Ink Black headings */
+  --color-text-secondary: #3e3e3e; /* Graphite body text */
+  --color-text-muted: #636363;    /* Smoke muted/metadata */
   
-  --color-accent: #f5a623;
-  --color-accent-hover: #e09510;
-  --color-accent-light: #fef3dc;
+  --color-accent: #f5a623;        /* Yellow — primary accent */
+  --color-accent-hover: #e09510;  /* Yellow — darker on hover */
+  --color-accent-light: rgba(245, 166, 35, 0.08); /* Yellow tint */
   
-  --color-icon-blue: #3b82f6;
+  --color-icon-blue: #f5a623;
   --color-icon-green: #22c55e;
   --color-icon-purple: #a855f7;
   --color-icon-orange: #f97316;
   
-  --color-border: #e5e5e0;
-  --color-border-strong: #cccccc;
+  --color-border: #f7f7f7;        /* Soft glow ring border */
+  --color-border-strong: #e5e5e5;
   
   --color-dark-bg: #0f0f0f;
   --color-dark-text: #ffffff;
@@ -207,20 +207,20 @@ body {
   --space-24: 96px;
   --space-32: 128px;
 
-  /* Border Radii */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 20px;
-  --radius-2xl: 28px;
-  --radius-full: 9999px;
+  /* Border Radii — Portal generous rounding */
+  --radius-sm: 7px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 26px;
+  --radius-2xl: 30px;
+  --radius-full: 50px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.12);
-  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Shadows — Portal soft glow rings (no heavy drops) */
+  --shadow-sm: rgb(247, 247, 247) 0px 0px 0px 1px;
+  --shadow-md: rgb(247, 247, 247) 0px 0px 0px 5px;
+  --shadow-lg: rgb(247, 247, 247) 0px 0px 0px 5px;
+  --shadow-xl: rgb(247, 247, 247) 0px 0px 0px 5px;
+  --shadow-card: rgb(247, 247, 247) 0px 0px 0px 5px;
 }
 
 /* ─────────────────────────────────────────
@@ -340,8 +340,8 @@ body {
 }
 
 .landing-page .hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  box-shadow: rgb(247, 247, 247) 0px 0px 0px 5px;
 }
 
 /* Custom Navigation transition on scroll */
