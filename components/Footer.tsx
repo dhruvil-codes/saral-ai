@@ -1,4 +1,5 @@
 import React from 'react';
+import { SaralLogoMark } from '@/assets/logo/logo';
 
 export default function Footer() {
     return (
@@ -17,8 +18,9 @@ export default function Footer() {
                         
                         <div className="lg:col-span-3 space-y-6">
                             {/* Saral AI Logo SVG or Text */}
-                            <a href="/" className="block">
-                                <h2 className="text-2xl font-bold tracking-tight font-display" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>Saral AI</h2>
+                            <a href="/" className="inline-flex items-center gap-2.5">
+                                <SaralLogoMark size={32} />
+                                <h2 className="text-2xl font-bold tracking-tight font-display text-neutral-900" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>Saral AI</h2>
                             </a>
                             <p className="text-sm/6 text-neutral-600 max-w-96">
                                 Saral AI provides zero-friction voice automation and instant WhatsApp lead capture to ensure Indian businesses never miss a customer again.
