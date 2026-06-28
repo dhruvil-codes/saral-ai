@@ -13,15 +13,15 @@ export function StatCard({ title, description, metric, className }: StatCardProp
   return (
     <div
       className={cn(
-        "bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] p-6 md:p-7 flex flex-col justify-between hover-lift min-h-[160px] md:min-h-[180px]",
+        "bg-[#ffffff] rounded-[26px] p-6 md:p-7 flex flex-col justify-between min-h-[160px] md:min-h-[180px] shadow-[0px_0px_0px_5px_#f7f7f7] transition-transform duration-200 hover:-translate-y-0.5",
         className
       )}
     >
       <div className="flex flex-col gap-1">
-        <h3 className="font-sans text-xs font-semibold tracking-wider text-[var(--color-text-secondary)] uppercase">
+        <h3 className="font-sans text-xs font-semibold tracking-wider text-[#636363] uppercase">
           {title}
         </h3>
-        <p className="font-sans text-xs md:text-sm text-[var(--color-text-muted)] leading-relaxed">
+        <p className="font-sans text-xs md:text-sm text-[#636363] leading-relaxed">
           {description}
         </p>
       </div>
