@@ -57,7 +57,7 @@ export default function Home() {
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
             <a 
-              href="#get-started" 
+              href="/login" 
               className="inline-flex items-center justify-center bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-primary)] font-semibold rounded-full px-7 py-3.5 shadow-[0_2px_8px_rgba(245,166,35,0.25)] transition-all transform hover:-translate-y-0.5 active:scale-98 text-base cursor-pointer"
             >
               Get Early Access
@@ -292,9 +292,12 @@ export default function Home() {
           {/* Centered CTA Trigger Block */}
           <div id="get-started" className="mt-20 text-center reveal">
             {/* Primary CTA (amber, pill-shaped, 1 per viewport) */}
-            <button className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-primary)] font-semibold rounded-full px-8 py-4 shadow-[0_4px_16px_rgba(245,166,35,0.35)] transition-all transform hover:-translate-y-0.5 active:scale-98 text-base cursor-pointer">
+            <a 
+              href="/login"
+              className="inline-block bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-primary)] font-semibold rounded-full px-8 py-4 shadow-[0_4px_16px_rgba(245,166,35,0.35)] transition-all transform hover:-translate-y-0.5 active:scale-98 text-base cursor-pointer"
+            >
               Get Started Free
-            </button>
+            </a>
             <p className="text-xs text-[var(--color-text-muted)] mt-3">
               No credit card required. Launch your first voice campaign in 15 minutes.
             </p>

@@ -48,14 +48,16 @@ const SaralLogo = ({ sticky }: { sticky: boolean }) => (
 );
 
 const GetStartedButton = ({ className }: { className?: string }) => (
-  <Button className={cn("relative text-sm font-medium rounded-full h-10 p-1 ps-5 pe-12 group transition-all duration-500 hover:ps-12 hover:pe-5 w-fit overflow-hidden bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] hover:bg-[var(--color-dark-bg)]/90 border-0 shadow-sm cursor-pointer", className)}>
-    <span className="relative z-10 transition-all duration-500 hover:cursor-pointer">
-      Get started
-    </span>
-    <div className="absolute right-1.5 w-7 h-7 bg-[var(--color-surface)] text-[var(--color-text-primary)] rounded-full flex items-center justify-center transition-all duration-500 group-hover:right-[calc(100%-34px)] group-hover:rotate-45">
-      <ArrowUpRight size={14} className="stroke-[2.5]" />
-    </div>
-  </Button>
+  <a href="/login" className="inline-block">
+    <Button className={cn("relative text-sm font-medium rounded-full h-10 p-1 ps-5 pe-12 group transition-all duration-500 hover:ps-12 hover:pe-5 w-fit overflow-hidden bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] hover:bg-[var(--color-dark-bg)]/90 border-0 shadow-sm cursor-pointer", className)}>
+      <span className="relative z-10 transition-all duration-500 hover:cursor-pointer">
+        Get started
+      </span>
+      <div className="absolute right-1.5 w-7 h-7 bg-[var(--color-surface)] text-[var(--color-text-primary)] rounded-full flex items-center justify-center transition-all duration-500 group-hover:right-[calc(100%-34px)] group-hover:rotate-45">
+        <ArrowUpRight size={14} className="stroke-[2.5]" />
+      </div>
+    </Button>
+  </a>
 );
 
 const Navbar = () => {
@@ -146,7 +148,7 @@ const Navbar = () => {
                   </DropdownMenuItem>
                 ))}
                 <div className="border-t border-[var(--color-border)] my-1.5 pt-1.5 px-1">
-                  <a href="#get-started" className="flex items-center justify-center w-full bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] text-xs font-semibold py-2 rounded-full hover:opacity-90 transition-opacity">
+                  <a href="/login" className="flex items-center justify-center w-full bg-[var(--color-dark-bg)] text-[var(--color-dark-text)] text-xs font-semibold py-2 rounded-full hover:opacity-90 transition-opacity">
                     Get started
                   </a>
                 </div>
