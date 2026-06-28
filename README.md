@@ -45,35 +45,47 @@ Saral AI is an intelligent, real-time voice receptionist built to help Micro, Sm
 
 ```mermaid
 graph TD
-    subgraph Clients["Client Interface"]
-        NextJS["Next.js App Router"]
-        WS_Client["WebSocket Audio Stream"]
-        REST_Client["REST API Client"]
+    %% Styling
+    classDef client fill:#FAFAF5,stroke:#1A1A1A,stroke-width:2px;
+    classDef gateway fill:#FFFFFF,stroke:#1A1A1A,stroke-width:2px;
+    classDef module fill:#D4EAC8,stroke:#1A1A1A,stroke-width:2px;
+    classDef highlight fill:#F5D000,stroke:#1A1A1A,stroke-width:2px;
+    classDef service fill:#FFFFFF,stroke:#1A1A1A,stroke-width:2px;
+
+    subgraph Clients["CLIENTS / FRONTEND (Web Browser & Devices)"]
+        NextJS["<b>Next.js App Router</b><br/>layout.tsx, page.tsx, globals.css"]:::client
+        WS_Client["<b>WebSocket Client</b><br/>Audio Streaming (Client-side mic)"]:::client
+        REST_Client["<b>HTTP REST Client</b><br/>Axios / Fetch calls for Auth & FAQs"]:::client
     end
 
-    subgraph Backend["FastAPI Server"]
-        main["FastAPI Gateway"]
-        ws_router["WebSocket Handler (/ws/call)"]
-        vad["Voice Activity Detector (VAD)"]
-        fallback["In-Memory Audio Cache"]
+    subgraph Backend["FASTAPI BACKEND SERVER (ASGI Application Gateway)"]
+        REST_Routers["<b>HTTP REST Routers (app/api)</b><br/>auth.py → JWT, Registrations, Login<br/>faqs.py → FAQ CRUD (MSME Context)"]:::gateway
+        
+        subgraph WSRouter["WebSocket Router (app/api/ws_call.py)"]
+            VAD["<b>VAD (app/utils/vad.py)</b><br/>Silence & speech trigger (webrtcvad / RMS)"]:::module
+            Fallback["<b>Fallback Audio Service</b><br/>Pre-cached failure voice (mitigate API outages)"]:::module
+            WS_Loop["<b>WebSocket Loop</b><br/>Transcribe → LLM → TTS Stream"]:::highlight
+        end
+
+        Core_DB["<b>Core & DB Client (app/core, app/db)</b><br/>config.py → Pydantic validation<br/>supabase_client.py → Client Init"]:::gateway
     end
 
-    subgraph External["AI & Speech Services"]
-        sarvam["Sarvam AI (STT & TTS)"]
-        groq["Groq LLM (gpt-oss-20b)"]
+    subgraph Persistence["DATABASES & SERVICES (Persistence & AI APIs)"]
+        Supabase["<b>Supabase Postgres DB</b><br/>Tables: users, faqs, call_logs, leads"]:::service
+        Sarvam["<b>Sarvam AI</b><br/>STT (saaras:v3), Streaming TTS (bulbul:v3)"]:::service
+        Groq["<b>Groq LLM Service</b><br/>Receptionist Reasoning (openai/gpt-oss-20b)"]:::service
+        Twilio["<b>Twilio / Celery (TODO)</b><br/>Webhook / Worker tasks"]:::service
     end
 
-    subgraph Data["Persistence Layer"]
-        supabase["Supabase Postgres"]
-    end
-
-    WS_Client <-->|PCM / WebM Streaming| ws_router
-    REST_Client -->|Auth & FAQ CRUD| main
-    ws_router <--> vad
-    ws_router <--|Fallback Audio| fallback
-    ws_router <--> sarvam
-    ws_router <--> groq
-    main --> supabase
+    %% Flow connections
+    REST_Client -->|REST API Calls| REST_Routers
+    WS_Client <-->|Audio stream (WebSockets)| WSRouter
+    
+    REST_Routers --> Supabase
+    WS_Loop -->|STT & TTS| Sarvam
+    WS_Loop -->|LLM Prompt| Groq
+    WS_Loop --> Supabase
+    Core_DB --> Supabase
 ```
 
 ---
