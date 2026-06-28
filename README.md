@@ -1,36 +1,233 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Saral AI 🎙️
 
-## Getting Started
+> Low-Latency, Real-Time Voice AI Receptionist for MSMEs
 
-First, run the development server:
+[![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react)](https://react.dev/)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Saral AI is an intelligent, real-time voice receptionist built to help Micro, Small, and Medium Enterprises (MSMEs) handle customer phone calls automatically. It operates over a bi-directional WebSocket connection to answer business queries, capture high-intent customer leads, and provide instant response streaming in regional languages.
+
+---
+
+## 📌 Table of Contents
+
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Tech Stack](#-tech-stack)
+- [Directory Structure](#-directory-structure)
+- [Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Backend Setup](#backend-setup)
+  - [Frontend Setup](#frontend-setup)
+- [Real-Time Voice Pipeline](#-real-time-voice-pipeline)
+- [Database Schema](#-database-schema)
+- [Telemetry & Latency Diagnostics](#-telemetry--latency-diagnostics)
+
+---
+
+## ✨ Key Features
+
+- **Bidirectional Streaming Audio**: Continuous full-duplex WebSocket communication (`/ws/call`) for natural, low-latency conversational turns.
+- **Multilingual Speech Intelligence**: Powered by Sarvam AI models (`saaras:v3` for Speech-to-Text and `bulbul:v3` for streaming Text-to-Speech) optimized for regional language nuances.
+- **Sub-Second LLM Conversational Logic**: Integrates Groq LLM (`openai/gpt-oss-20b`) to process context-aware responses with minimum turnaround delay.
+- **Adaptive Voice Activity Detection (VAD)**: Utilizes `webrtcvad` with RMS energy fallback to detect end-of-speech silence thresholds dynamically. Supports streaming raw PCM and containerized formats (WebM, Ogg, WAV).
+- **Automated Lead Extraction**: Captures key customer metrics directly from audio transcripts, including caller intent, urgency level, budget, and contact information.
+- **Fault-Tolerant Audio Caching**: Features pre-cached fallback responses in memory to maintain call stability if third-party APIs experience transient timeouts.
+- **Real-Time Analytics & FAQ Control**: Administrative dashboard enabling business owners to update knowledge bases and view call logs.
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    subgraph Clients["Client Interface"]
+        NextJS["Next.js App Router"]
+        WS_Client["WebSocket Audio Stream"]
+        REST_Client["REST API Client"]
+    end
+
+    subgraph Backend["FastAPI Server"]
+        main["FastAPI Gateway"]
+        ws_router["WebSocket Handler (/ws/call)"]
+        vad["Voice Activity Detector (VAD)"]
+        fallback["In-Memory Audio Cache"]
+    end
+
+    subgraph External["AI & Speech Services"]
+        sarvam["Sarvam AI (STT & TTS)"]
+        groq["Groq LLM (gpt-oss-20b)"]
+    end
+
+    subgraph Data["Persistence Layer"]
+        supabase["Supabase Postgres"]
+    end
+
+    WS_Client <-->|PCM / WebM Streaming| ws_router
+    REST_Client -->|Auth & FAQ CRUD| main
+    ws_router <--> vad
+    ws_router <--|Fallback Audio| fallback
+    ws_router <--> sarvam
+    ws_router <--> groq
+    main --> supabase
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Domain | Technologies |
+| :--- | :--- |
+| **Frontend Framework** | Next.js 16 (App Router), React 19, TypeScript |
+| **Styling & UI** | Tailwind CSS v4, Framer Motion, Lucide Icons, Radix UI |
+| **Backend Framework** | Python 3.10+, FastAPI, Uvicorn, WebSockets |
+| **AI & ML Pipeline** | Sarvam AI (STT/TTS), Groq LLM, WebRTCVAD, PyDantic |
+| **Database & Auth** | Supabase (PostgreSQL), Passlib (Bcrypt), Python-Jose |
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 📁 Directory Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+saral-ai/
+├── app/                        # Next.js frontend application pages and layouts
+│   ├── auth/                   # Authentication routes and callbacks
+│   ├── dashboard/              # Business admin portal and analytics
+│   ├── globals.css             # Global CSS styling and design tokens
+│   ├── layout.tsx              # Root HTML wrapper
+│   └── page.tsx                # Main landing page
+├── components/                 # Reusable UI components
+├── saral-ai-backend/           # FastAPI backend application
+│   ├── app/
+│   │   ├── api/                # REST endpoints and WebSocket call routers
+│   │   ├── core/               # Configuration and environment management
+│   │   ├── db/                 # Supabase client and database schemas
+│   │   ├── services/           # Integration clients (Sarvam, Groq, Fallback)
+│   │   ├── utils/              # Voice Activity Detection algorithms
+│   │   └── main.py             # FastAPI entry point
+│   ├── requirements.txt        # Backend dependencies
+│   └── tests/                  # Backend testing suite
+├── architecture.md             # In-depth architectural specification
+└── DESIGN.md                   # Authoritative design tokens and system guidelines
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🚀 Getting Started
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Prerequisites
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Node.js 18+ and `npm` or `bun`
+- Python 3.10+
+- Active accounts and API keys for **Supabase**, **Sarvam AI**, and **Groq**
+
+---
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```bash
+   cd saral-ai-backend
+   ```
+
+2. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv .venv
+   # Windows
+   .venv\Scripts\activate
+   # Linux/macOS
+   source .venv/bin/activate
+   ```
+
+3. Install requirements:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure environment variables. Copy `.env.example` to `.env` and fill in your credentials:
+   ```env
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_KEY=your_supabase_anon_or_service_key
+   SARVAM_API_KEY=your_sarvam_api_key
+   GROQ_API_KEY=your_groq_api_key
+   SECRET_KEY=your_jwt_secret_key
+   ```
+
+5. Run the development server:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+
+---
+
+### Frontend Setup
+
+1. Navigate to the root project directory:
+   ```bash
+   cd ..
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure environment variables in `.env.local`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+   ```
+
+4. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Access the application in your browser at `http://localhost:3000`.
+
+---
+
+## 🔁 Real-Time Voice Pipeline
+
+The voice call processing loop operates through the following stages:
+
+1. **Audio Ingestion**: Audio chunks are received over WebSocket (`/ws/call`).
+2. **Speech Detection**: Voice Activity Detector monitors audio frames for trailing silence (default threshold 600ms).
+3. **Transcription**: Sarvam AI converts speech audio to text output.
+4. **LLM Inference**: Groq processes customer queries with conversational context history.
+5. **Synthesis & Streaming**: Response text is converted back to speech stream and delivered to the client.
+
+---
+
+## 📊 Database Schema
+
+The core system schema maintained in PostgreSQL includes:
+
+- **`users`**: Business owner details, credentials, and configuration settings.
+- **`faqs`**: Custom facts, business operating hours, and service responses used by the LLM.
+- **`call_logs`**: Call metrics, duration logs, and generated transcript summaries.
+- **`leads`**: Parsed client leads containing contact info, budget, and urgency classifications.
+
+---
+
+## 📈 Telemetry & Latency Diagnostics
+
+Saral AI monitors performance metrics per audio exchange to ensure low-latency performance:
+
+- `stt_ms`: Speech-to-Text latency and buffering overhead.
+- `llm_ms`: Groq inference duration.
+- `tts_ms`: Speech synthesis and WebSocket chunk delivery time.
+- `total_ms`: Round-trip execution time.
+
+Diagnostic telemetry logs are emitted in JSON format during active sessions for monitoring system performance.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
