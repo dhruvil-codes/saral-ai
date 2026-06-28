@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import {
   Phone,
   Users,
   Clock,
   PhoneMissed,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
+import { HeadlessOnboardingDemo } from "@/components/onboarding-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -23,13 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { ChartBar } from "@/components/dashboard/chart-bar";
 
 const metricCards = [
   {
@@ -62,22 +60,6 @@ const metricCards = [
   },
 ];
 
-const callVolumeData = [
-  { day: "Mon", calls: 89 },
-  { day: "Tue", calls: 112 },
-  { day: "Wed", calls: 97 },
-  { day: "Thu", calls: 134 },
-  { day: "Fri", calls: 128 },
-  { day: "Sat", calls: 72 },
-  { day: "Sun", calls: 54 },
-];
-
-const chartConfig = {
-  calls: {
-    label: "Calls",
-    color: "oklch(0.55 0.15 250)",
-  },
-} satisfies ChartConfig;
 
 const recentCalls = [
   { caller: "+91 98765 43210", status: "Completed", duration: "3m 42s" },
@@ -89,32 +71,59 @@ const recentCalls = [
 ];
 
 export default function DashboardPage() {
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   return (
     <div className="flex flex-col gap-6">
+      <HeadlessOnboardingDemo open={showOnboarding} onOpenChange={setShowOnboarding} />
+
+      {/* Onboarding Banner / Trigger */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-[#f5a623]/15 via-muted/40 to-card border border-[#f5a623]/30 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-full bg-[#f5a623] text-black flex items-center justify-center shrink-0 shadow-xs">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <h3 className="font-sans font-semibold text-sm text-foreground">
+              New Voice Agent Onboarding Setup
+            </h3>
+            <p className="font-sans text-xs text-muted-foreground">
+              Configure your agent preferences, WhatsApp sync, and FAQ knowledge base.
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={() => setShowOnboarding(true)}
+          className="rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-sans font-semibold text-xs px-4 h-9 shrink-0 shadow-xs"
+        >
+          Open Onboarding Flow
+        </Button>
+      </div>
+
       {/* ── Metric Cards Row ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {metricCards.map((card) => (
           <Card
             key={card.title}
-            className="dashboard-card border-0 rounded-xl"
+            className="dashboard-card border border-border/60 rounded-xl bg-card p-6 py-0 gap-0 flex flex-col justify-between"
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-              <CardTitle className="text-sm font-medium text-muted-foreground tracking-wide">
+            <div className="pt-6 pb-2 flex flex-row items-center justify-between">
+              <span className="text-base font-semibold text-muted-foreground tracking-tight">
                 {card.title}
-              </CardTitle>
-              <div className="size-8 rounded-lg bg-muted/50 flex items-center justify-center">
-                <card.icon className="size-4 text-muted-foreground" />
+              </span>
+              <div className="size-10 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">
+                <card.icon className="size-5 text-muted-foreground" />
               </div>
-            </CardHeader>
-            <CardContent className="px-6 pb-6 pt-0">
-              <div className="metric-value">{card.value}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-2">
+            </div>
+            <div className="pb-6 pt-1">
+              <div className="metric-value text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-none">{card.value}</div>
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mt-2">
                 {card.trend === "up" && (
-                  <TrendingUp className="size-3 text-emerald-500" />
+                  <TrendingUp className="size-4 text-emerald-500 shrink-0" />
                 )}
                 {card.description}
               </p>
-            </CardContent>
+            </div>
           </Card>
         ))}
       </div>
@@ -122,53 +131,34 @@ export default function DashboardPage() {
       {/* ── Chart + Recent Calls Row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
         {/* Call Volume Chart */}
-        <Card className="dashboard-card border-0 rounded-xl lg:col-span-4">
-          <CardHeader className="p-6 pb-4">
-            <CardTitle className="card-heading">Call Volume</CardTitle>
-            <CardDescription className="text-sm text-muted-foreground mt-0.5">
-              Last 7 days of inbound calls
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-6 pb-6 pt-0">
-            <ChartContainer config={chartConfig} className="h-[260px] w-full">
-              <BarChart accessibilityLayer data={callVolumeData}>
-                <CartesianGrid vertical={false} stroke="oklch(0.92 0 0)" />
-                <XAxis
-                  dataKey="day"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tick={{ fontSize: 12, fill: "oklch(0.556 0 0)" }}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  tick={{ fontSize: 12, fill: "oklch(0.556 0 0)" }}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dashed" />}
-                />
-                <Bar
-                  dataKey="calls"
-                  fill="var(--color-calls)"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-4">
+          <ChartBar />
+        </div>
 
         {/* Recent Calls Table */}
-        <Card className="dashboard-card border-0 rounded-xl lg:col-span-3">
-          <CardHeader className="p-6 pb-4">
-            <CardTitle className="card-heading">Recent Calls</CardTitle>
-            <CardDescription className="text-sm text-muted-foreground mt-0.5">
-              Latest 6 inbound calls
-            </CardDescription>
+        <Card className="dashboard-card border border-border/60 rounded-xl bg-card shadow-xs lg:col-span-3 py-0 gap-0 overflow-hidden flex flex-col justify-between">
+          <CardHeader className="w-full px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 bg-muted/10 shrink-0">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="card-heading text-lg font-semibold tracking-tight text-foreground">
+                  Recent Calls
+                </CardTitle>
+                <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-500/30 text-xs font-medium rounded-full px-2.5 py-0.5 shrink-0">
+                  Real-time Log
+                </Badge>
+              </div>
+              <CardDescription className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                <Phone className="size-3.5" /> Latest 6 inbound call records
+              </CardDescription>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+              <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium border border-emerald-500/20">
+                100% Handled
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent className="px-6 pb-6 pt-0">
+          <CardContent className="p-6 pt-4 flex-1">
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-border/50 hover:bg-transparent">
