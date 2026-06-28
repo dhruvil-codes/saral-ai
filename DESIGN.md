@@ -1,480 +1,1164 @@
-# Portal — Style Reference
+# Portal — Design System
 
-> twilight serif editorial — a premium indie magazine spread sitting inside a native iOS aesthetic
+## Reference Website: https://useportal.net/
 
-**Theme:** light
+## 1. Brand Personality
 
-Portal uses a twilight-editorial visual language: a dramatic sunset gradient hero (sky-blue fading through violet to warm coral) gives way to a clean, paper-white editorial canvas below. Display headlines are set in Perfectly Nineties — a confident retro serif that signals craft over typical startup sans. Body and UI copy stay in Inter at restrained sizes, with one vivid iOS-blue accent (#007aff) punctuating an otherwise achromatic system. Surfaces are flat and generously rounded: cards at 22-30px, buttons as full pills at 50px, and the floating nav as a soft white capsule. Elevation is whispered rather than dropped — the system prefers 1px outlines and pale #f7f7f7 glow rings over heavy shadows.
+Portal is a freelance toolkit (proposals → payments). The visual language is **clean, professional, slightly warm** — not a cold SaaS blue. It leans into lifestyle/craft photography, generous whitespace, and soft neutrals with a single orange/amber accent. The tone is confident and direct, no hype.
 
-## Tokens — Colors
+---
 
-| Name          | Value                                                                         | Token                   | Role                                                                                                                                                                                                            |
-| ------------- | ----------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Signal Blue   | `#007aff`                                                                     | `--color-signal-blue`   | Primary action buttons, active states, brand icon highlights, inline links — the only chromatic accent in an otherwise achromatic system. iOS-native vivid blue that makes functional elements feel switched on |
-| Ink Black     | `#000000`                                                                     | `--color-ink-black`     | Headings, primary borders, button text — maximum-contrast structural color                                                                                                                                      |
-| Graphite      | `#3e3e3e`                                                                     | `--color-graphite`      | Body text, secondary borders — softer than black for sustained reading on white                                                                                                                                 |
-| Smoke         | `#636363`                                                                     | `--color-smoke`         | Muted helper text, metadata labels, subtle borders                                                                                                                                                              |
-| Paper White   | `#ffffff`                                                                     | `--color-paper-white`   | Hairline borders, dividers, input outlines, and card edges on light surfaces. Do not promote it to the primary CTA color                                                                                        |
-| Ash Mist      | `#f7f7f7`                                                                     | `--color-ash-mist`      | Page canvas background, soft glow rings around cards and images, pale elevation halos                                                                                                                           |
-| Dusk Gradient | `linear-gradient(180deg, #4a7ff2 0%, #7b7ed8 30%, #c98ab5 65%, #e8a87c 100%)` | `--color-dusk-gradient` | Hero background — sky-blue descending through violet to warm coral sunset with landscape silhouettes at the base. Defines the system's only atmospheric moment                                                  |
+## 2. Color Tokens
 
-## Tokens — Typography
+```css
+/* --- Core Palette --- */
+--color-bg: #f5f5f0; /* warm off-white — page background */
+--color-surface: #ffffff; /* cards, modals, nav */
+--color-surface-alt: #f0f0ea; /* subtle section tint */
 
-### Perfectly Nineties Regular — Display and heading — the signature editorial voice. Used exclusively for H1/H2 at 36-48px. The retro serif is the system's personality anchor, deliberately contrasting with Inter body to feel like a magazine, not a dashboard · `--ITC Garamond Book Narrow Regular`
+/* --- Text --- */
+--color-text-primary: #1a1a1a; /* headings, body */
+--color-text-secondary: #555555; /* subtext, captions */
+--color-text-muted: #888888; /* meta, placeholders */
 
-- **Substitute:** Playfair Display, DM Serif Display, or Recoleta
-- **Weights:** 400
-- **Sizes:** 36px, 48px
-- **Line height:** 1.00
-- **Letter spacing:** normal
-- **OpenType features:** `"blwf", "cv03", "cv04", "cv09", "cv11"`
-- **Role:** Display and heading — the signature editorial voice. Used exclusively for H1/H2 at 36-48px. The retro serif is the system's personality anchor, deliberately contrasting with Inter body to feel like a magazine, not a dashboard
+/* --- Accent (primary CTA + icon fills) --- */
+--color-accent: #f5a623; /* amber/orange */
+--color-accent-hover: #e09510;
+--color-accent-light: #fef3dc; /* tinted backgrounds behind icons */
 
-### Inter — Body, nav, links, labels — the workhorse UI font. Weight 400 for body, 500 for nav/medium emphasis, 600 for button text. Tighter tracking gives it a refined iOS-native feel · `--font-inter`
+/* --- Feature icon circles --- */
+--color-icon-blue: #3b82f6;
+--color-icon-green: #22c55e;
+--color-icon-purple: #a855f7;
+--color-icon-orange: #f97316;
 
-- **Substitute:** SF Pro Text, -apple-system, Helvetica Neue
-- **Weights:** 400, 500, 600
-- **Sizes:** 10px, 12px, 14px, 16px, 18px
-- **Line height:** 1.20-1.35
-- **Letter spacing:** -0.02em
-- **OpenType features:** `"blwf", "cv03", "cv04", "cv09", "cv11"`
-- **Role:** Body, nav, links, labels — the workhorse UI font. Weight 400 for body, 500 for nav/medium emphasis, 600 for button text. Tighter tracking gives it a refined iOS-native feel
+/* --- Border & Dividers --- */
+--color-border: #e5e5e0;
+--color-border-strong: #cccccc;
 
-### System sans-serif — Utility/microcopy fallback — small inline metadata, secondary labels · `--font-system-sans-serif`
+/* --- Dark section (footer CTA) --- */
+--color-dark-bg: #0f0f0f;
+--color-dark-text: #ffffff;
+```
 
-- **Substitute:** inherit Inter
-- **Weights:** 400
-- **Sizes:** 12px
-- **Line height:** 1.20
-- **Letter spacing:** normal
-- **Role:** Utility/microcopy fallback — small inline metadata, secondary labels
+---
+
+## 3. Typography
+
+### Typefaces
+
+| Role                | Family                       | Source                                                     |
+| ------------------- | ---------------------------- | ---------------------------------------------------------- |
+| Display / Headlines | **ITC Garamond Book Narrow** | Local Font (`/fonts/ITC Garamond Book Narrow Regular.otf`) |
+| Body / UI           | **Inter**                    | Google Fonts                                               |
+| Mono (code/labels)  | **JetBrains Mono**           | Google Fonts                                               |
+
+```html
+<!-- Local Font configuration in Next.js layout / stylesheet -->
+<!-- public/fonts/ITC Garamond Book Narrow Regular.otf -->
+```
 
 ### Type Scale
 
-| Role       | Size | Line Height | Letter Spacing | Token               |
-| ---------- | ---- | ----------- | -------------- | ------------------- |
-| micro      | 10px | 1.2         | -0.2px         | `--text-micro`      |
-| caption    | 12px | 1.2         | -0.24px        | `--text-caption`    |
-| body-sm    | 14px | 1.3         | -0.28px        | `--text-body-sm`    |
-| body       | 16px | 1.35        | -0.32px        | `--text-body`       |
-| heading-sm | 18px | 1.35        | -0.36px        | `--text-heading-sm` |
-| heading    | 36px | 1           | —              | `--text-heading`    |
-| display    | 48px | 1           | —              | `--text-display`    |
-
-## Tokens — Spacing & Shapes
-
-**Density:** comfortable
-
-### Spacing Scale
-
-| Name | Value | Token           |
-| ---- | ----- | --------------- |
-| 4    | 4px   | `--spacing-4`   |
-| 5    | 5px   | `--spacing-5`   |
-| 6    | 6px   | `--spacing-6`   |
-| 8    | 8px   | `--spacing-8`   |
-| 10   | 10px  | `--spacing-10`  |
-| 12   | 12px  | `--spacing-12`  |
-| 14   | 14px  | `--spacing-14`  |
-| 16   | 16px  | `--spacing-16`  |
-| 20   | 20px  | `--spacing-20`  |
-| 24   | 24px  | `--spacing-24`  |
-| 36   | 36px  | `--spacing-36`  |
-| 40   | 40px  | `--spacing-40`  |
-| 45   | 45px  | `--spacing-45`  |
-| 60   | 60px  | `--spacing-60`  |
-| 80   | 80px  | `--spacing-80`  |
-| 100  | 100px | `--spacing-100` |
-
-### Border Radius
-
-| Element | Value   |
-| ------- | ------- |
-| nav     | 22px    |
-| cards   | 22-30px |
-| badges  | 50px    |
-| images  | 30-40px |
-| buttons | 50px    |
-
-### Shadows
-
-| Name     | Value                                                          | Token               |
-| -------- | -------------------------------------------------------------- | ------------------- |
-| subtle   | `rgb(247, 247, 247) 0px 0px 0px 5px`                           | `--shadow-subtle`   |
-| subtle-2 | `rgba(255, 255, 255, 0.6) 0px 0.5px 0px 0.5px inset, rgba(...` | `--shadow-subtle-2` |
-| subtle-3 | `rgba(255, 255, 255, 0.6) 0px 0.5px 0px 0.5px inset`           | `--shadow-subtle-3` |
-| subtle-4 | `rgb(247, 247, 247) 0px 0px 0px 1px`                           | `--shadow-subtle-4` |
-| subtle-5 | `rgb(255, 255, 255) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0...` | `--shadow-subtle-5` |
-| subtle-6 | `rgb(140, 194, 255) 0px 1px 0px 1px inset`                     | `--shadow-subtle-6` |
-
-### Layout
-
-- **Page max-width:** 1200px
-- **Section gap:** 80-120px
-- **Card padding:** 20px
-- **Element gap:** 10px
-
-## Components
-
-### Hero Pill Button
-
-**Role:** Primary CTA on the gradient hero — the most visible interactive element on the page
-
-50px border-radius, #ffffff background, #000000 text in Inter 600 at 14-16px, padding 14px 24px. No border. The white-on-gradient contrast makes it the clear action target against the blue-to-coral backdrop
-
-### Ghost Pill Button
-
-**Role:** Secondary CTA or cancel action
-
-50px border-radius, transparent background, 1.5px #000000 border, #000000 text in Inter 500 at 14-16px, padding 12px 22px. Outlined only — never filled
-
-### Floating Nav Capsule
-
-**Role:** Top-level site navigation — replaces a traditional full-width header bar
-
-22px border-radius, #ffffff background, 1px border with 5px #f7f7f7 soft glow ring. Contains brand mark (gradient circle icon + 'Portal' wordmark in Inter 600 18px) on left, nav links (Product, Blog, Contact in Inter 500 14px #000000) on right. Padding 8px 16px. Floats with 16-24px top margin
-
-### Device Mockup Card
-
-**Role:** Product showcase frame in the hero — contains the Portal app interface preview
-
-Outer frame at 22-30px border-radius, #ffffff background, 5px #f7f7f7 glow ring as elevation. Inner screen area shows the Portal product UI at 16px border-radius. The mockup overlaps into the landscape silhouette at the hero's bottom
-
-### Editorial Content Block
-
-**Role:** Below-the-fold text sections on the white/light canvas
-
-Centered or left-aligned text column at 640-720px max reading width. H2 in Perfectly Nineties 400 at 36px, #000000, line-height 1.0. Body in Inter 400 at 16px, #3e3e3, line-height 1.35, letter-spacing -0.32px. Paragraphs separated by 16-20px gap. Section gap 80-120px from adjacent blocks
-
-### Brand Mark Icon
-
-**Role:** Logo lockup in the nav capsule and footer
-
-Circular icon with blue-to-violet gradient (matches hero gradient mid-tones), containing a white paper-plane or forward-arrow glyph. Paired with 'Portal' wordmark in Inter 600 18px, #000000. Icon-to-text gap 8px
-
-### Project Card
-
-**Role:** Inside the Portal product UI — individual project portal entries
-
-16-22px border-radius, #ffffff background, 1px #f7f7f7 border or soft glow. Padding 20px. Project title in Inter 600 16px, metadata in Inter 400 14px #636363, status badges below
-
-### Status Badge
-
-**Role:** Project status indicators in the product UI
-
-50px border-radius full pill, Inter 500 12px text, padding 4px 10px. Subtle #f7f7f7 background for neutral states, #007aff-tinted background for active/paid states
-
-### Nav Link Item
-
-**Role:** Individual link in the floating nav capsule
-
-Inter 500 14px, #000000, 8px horizontal padding, 4px vertical padding. No underline. Hover: opacity 0.6 or subtle color transition
-
-### Soft Glow Ring
-
-**Role:** Elevation substitute — surrounds cards, mockups, and floating images
-
-0px 0px 0px 5px #f7f7f7 — a pale outline that creates the sense of light emanating from the element rather than a traditional drop shadow. The system's depth language
-
-### Hero Gradient Background
-
-**Role:** Full-bleed atmospheric hero section
-
-180deg linear gradient from #4a7ff2 (sky-blue) at top through #7b7ed8 (violet) to #c98ab5 (mauve) and #e8a87c (warm coral) at the bottom, with dark landscape tree/horizon silhouettes along the bottom 15-20% of the viewport
-
-## Do's and Don'ts
-
-### Do
-
-- Set all display headings in Perfectly Nineties Regular at 36-48px, line-height 1.0, weight 400 — this serif is the system's signature voice and must not be diluted by using it at smaller sizes
-- Use #007aff exclusively for functional accents: primary CTA fills, active states, brand icon highlights, and inline links. Never use it for decorative backgrounds or large surface fills
-- Make every button a full pill at 50px border-radius with no exception — 12-14px vertical padding, 20-24px horizontal padding
-- Keep body text in Inter at 14-16px, line-height 1.30-1.35, with -0.02em letter-spacing for a refined iOS-native feel
-- Round all card and image corners to 22-30px — the generous radii are what give the system its soft, premium character
-- Default the page canvas to #f7f7f7 with cards on #ffffff. Use the 5px #f7f7f7 glow ring as your primary elevation technique instead of drop shadows
-- Use #000000 for headings and primary borders only; switch to #3e3e3 for body text and #636363 for muted helper text and secondary metadata
-
-### Don't
-
-- Don't introduce a second chromatic accent color — the system is monochromatic plus exactly one blue (#007aff)
-- Don't use Perfectly Nineties for body text, captions, buttons, or UI labels — it is display-only at 36px and above
-- Don't apply drop shadows heavier than the 5px #f7f7f7 glow ring or 1px #000000 outline — heavy shadows break the flat editorial feel
-- Don't use sharp corners (0-4px radius) on any interactive element or card — minimum 7px, prefer 16px+ for cards and 50px for buttons
-- Don't set body text below 14px in Inter or above weight 600 — the weight range is the system's restraint mechanism
-- Don't place #000000 text directly on a chromatic or gradient background — text must sit on white or #f7f7f7 surfaces only
-- Don't use #007aff for large fills, hero backgrounds, or decorative shapes — it is a functional accent, not a surface color
-
-## Surfaces
-
-| Level | Name            | Value     | Purpose                                                                                        |
-| ----- | --------------- | --------- | ---------------------------------------------------------------------------------------------- |
-| 0     | Page Canvas     | `#f7f7f7` | Base background for all content sections below the hero gradient                               |
-| 1     | Card Surface    | `#ffffff` | Product cards, project entries, content blocks sitting on the canvas                           |
-| 2     | Nav Pill        | `#ffffff` | Floating navigation capsule with #f7f7f7 soft glow ring                                        |
-| 3     | Hero Atmosphere | `#7a7fd4` | Full-bleed gradient background for the hero section — the only chromatic surface in the system |
-
-## Elevation
-
-- **Cards and mockups:** `0px 0px 0px 5px #f7f7f7`
-- **Filled buttons:** `inset 0 1px 0 0 #ffffff, 0 0 0 1px rgba(0,0,0,0.15), 0 3px 2px 0 rgba(0,0,0,0.06)`
-
-## Imagery
-
-The hero is the only atmospheric visual: a full-bleed gradient sunset landscape (blue sky through violet to coral) with silhouetted tree horizons along the bottom edge. All other imagery is product screenshots presented inside white device-frame mockups with soft glow rings. There is no lifestyle photography, no stock imagery, and no illustrations. The product UI itself (shown in the device mockup) uses white cards with clean typography and small inline data elements. The visual strategy is one dramatic atmospheric moment (the hero) followed by pure UI and editorial typography. The blue brand accent (#007aff) appears in the gradient brand icon and as functional highlights in the product UI — never as decorative imagery.
-
-## Layout
-
-Centered max-width layout at approximately 1200px. The hero is full-bleed with the gradient extending edge-to-edge, and a device mockup overlapping the bottom into a landscape silhouette. Below the hero, content flows on a #f7f7f7 canvas with centered or left-aligned text columns at 640-720px reading width. Section gaps are generous (80-120px) to let the editorial typography breathe. The navigation is a floating pill capsule anchored at the top of the viewport with margin, not a full-width bar. Content sections are single-column and text-dominant — no multi-column grids or card grids in the marketing sections. The product mockup is the only visual element competing with text in the hero composition.
-
-## Agent Prompt Guide
-
-## Quick Color Reference
-
-- text (headings): #000000
-- text (body): #3e3e3e
-- text (muted): #636363
-- background (canvas): #f7f7f7
-- background (card): #ffffff
-- border: #000000 (primary) / #f7f7f7 (soft glow ring)
-- accent: #007aff
-- primary action: #007aff (filled action)
-
-## Example Component Prompts
-
-1. Create a Primary Action Button: #007aff background, #ffffff text, 9999px radius, compact pill padding. Use this filled treatment for the main CTA.
-
-2. **Floating nav capsule**: White #ffffff background, 22px border-radius, 1px subtle border with 5px #f7f7f7 soft glow ring. Left: gradient circle icon (40px, blue-to-violet gradient) + 'Portal' wordmark in Inter 600 18px #000000. Right: 'Product', 'Blog', 'Contact' in Inter 500 14px #000000, separated by 20px gaps. Container padding 8px 16px. Float at top with 20px margin.
-
-3. **Editorial content block**: Centered on #f7f7f7 canvas, max-width 640px. H2 in Perfectly Nineties Regular 400 at 36px, #000000, line-height 1.0. Body paragraph in Inter 400 at 16px, #3e3e3e, line-height 1.35, letter-spacing -0.32px. Paragraph margin-bottom 20px. Section gap 100px above and below.
-
-4. **Device mockup card**: White #ffffff frame at 22px border-radius, 5px #f7f7f7 glow ring. Inner screen area: #ffffff background, project card with 16px border-radius containing a title in Inter 600 16px #000000, metadata in Inter 400 14px #636363, and a status badge (50px radius pill, Inter 500 12px).
-
-5. **Ghost nav link**: Inter 500 14px, #000000, padding 4px 8px, no underline, no border. Hover: opacity 0.6 with 200ms transition. Set inside a white #ffffff nav capsule with 22px border-radius.
-
-## Signature Choices
-
-What makes this system visually distinctive from the sea of generic SaaS landing pages:
-
-- **Retro serif in a tech product**: Perfectly Nineties Regular at display sizes is anti-convention for SaaS. Most startups use geometric sans for everything. The serif creates a magazine/editorial voice that signals craft and taste over speed and engineering.
-
-- **Single iOS-blue accent**: #007aff is Apple's system blue. Using it as the only chromatic accent in an otherwise achromatic system is a deliberate native-aesthetic choice — it makes the product feel at home on macOS/iOS without copying Apple wholesale.
-
-- **Glow rings instead of shadows**: The 5px #f7f7f7 halo around cards and mockups is a depth technique borrowed from visionOS/frosted glass. It whispers elevation rather than declaring it with a drop shadow.
-
-- **50px pill buttons**: Full rounding on all interactive elements. The pill is the system's gesture toward softness — combined with the serif headlines, it creates a product that feels handcrafted rather than engineered.
-
-- **Hero as atmosphere, not pitch**: The gradient landscape hero doesn't show a dashboard screenshot or a feature list — it sets a mood. The product earns attention through beauty, not claims. This is unusual in a productivity SaaS category that typically leads with product screenshots.
-
-## Similar Brands
-
-- **Linear** — Same monochromatic palette with a single vivid accent color, generous rounded corners, and clean Inter-based UI typography
-- **Pitch** — Editorial display-serif headlines paired with minimal sans-serif body, clean white surfaces, and restrained accent usage
-- **Framer** — Magazine-style editorial layout with dramatic hero visuals and large confident serif type treatment
-- **Arc Browser** — Distinctive gradient brand identity with soft, generous rounded shapes and a single functional accent color
-
-## Quick Start
-
-### CSS Custom Properties
+```css
+/* --- Display --- */
+--text-display-xl: clamp(2.75rem, 6vw, 4.5rem); /* hero H1 */
+--text-display-lg: clamp(2rem, 4vw, 3rem); /* section H2 */
+--text-display-md: clamp(1.5rem, 3vw, 2.25rem); /* sub-section H3 */
+
+/* --- Body --- */
+--text-body-lg: 1.125rem; /* lead paragraph */
+--text-body-md: 1rem; /* default body */
+--text-body-sm: 0.875rem; /* captions, meta */
+--text-body-xs: 0.75rem; /* labels, badges */
+
+/* --- Line Heights --- */
+--lh-display: 1.1;
+--lh-body: 1.65;
+--lh-ui: 1.4;
+
+/* --- Letter Spacing --- */
+--ls-tight: -0.02em; /* large headings */
+--ls-normal: 0;
+--ls-wide: 0.05em; /* all-caps labels */
+```
+
+### Type Styles (semantic classes)
 
 ```css
+.t-hero {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: var(--text-display-xl);
+  font-weight: 700;
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-tight);
+  color: var(--color-text-primary);
+}
+
+.t-section-heading {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: var(--text-display-lg);
+  font-weight: 700;
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-tight);
+}
+
+.t-subheading {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-display-md);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.t-body-lead {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-lg);
+  font-weight: 400;
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+
+.t-body {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+
+.t-label {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+}
+
+.t-nav {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+}
+```
+
+---
+
+## 4. Spacing Scale
+
+Based on a 4px base unit.
+
+```css
+--space-1: 4px;
+--space-2: 8px;
+--space-3: 12px;
+--space-4: 16px;
+--space-5: 20px;
+--space-6: 24px;
+--space-8: 32px;
+--space-10: 40px;
+--space-12: 48px;
+--space-16: 64px;
+--space-20: 80px;
+--space-24: 96px;
+--space-32: 128px;
+
+/* Section vertical rhythm */
+--section-padding-y: clamp(64px, 10vw, 120px);
+```
+
+---
+
+## 5. Layout & Grid
+
+```css
+/* Container */
+--container-max: 1120px;
+--container-gutter: clamp(16px, 5vw, 48px);
+
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-gutter);
+}
+
+/* Grid systems used on the page */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-8);
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+}
+.grid-feature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-16);
+  align-items: center;
+}
+
+/* Feature rows alternate image left / image right */
+.grid-feature:nth-child(even) {
+  direction: rtl;
+}
+.grid-feature:nth-child(even) > * {
+  direction: ltr;
+}
+
+@media (max-width: 768px) {
+  .grid-2,
+  .grid-3,
+  .grid-feature {
+    grid-template-columns: 1fr;
+  }
+}
+```
+
+---
+
+## 6. Border Radius
+
+```css
+--radius-sm: 4px; /* tags, badges */
+--radius-md: 8px; /* inputs, small cards */
+--radius-lg: 12px; /* cards */
+--radius-xl: 20px; /* large panels, feature boxes */
+--radius-2xl: 28px; /* hero browser mockup */
+--radius-full: 9999px; /* pills, icon circles */
+```
+
+---
+
+## 7. Shadows & Elevation
+
+```css
+--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05);
+--shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+--shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+--shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.12); /* hero browser mockup */
+
+/* Floating card used in feature sections */
+--shadow-card: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.05);
+```
+
+---
+
+## 8. Components
+
+### 8.1 Navigation
+
+```
+┌────────────────────────────────────────────────────────┐
+│  [Logo]              Product   Blog   Contact   [CTA]  │
+└────────────────────────────────────────────────────────┘
+```
+
+```css
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(245, 245, 240, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  list-style: none;
+}
+
+.nav-links a {
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-links a:hover {
+  color: var(--color-text-primary);
+}
+```
+
+---
+
+### 8.2 Buttons
+
+```css
+/* Base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    transform 0.1s,
+    box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+/* Primary — amber fill */
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  padding: var(--space-3) var(--space-6);
+  box-shadow: 0 2px 8px rgba(245, 166, 35, 0.35);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 4px 16px rgba(245, 166, 35, 0.4);
+}
+
+/* Secondary — outline */
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1.5px solid var(--color-border-strong);
+  padding: var(--space-3) var(--space-6);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+/* Ghost / text link */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-4);
+}
+
+.btn-ghost:hover {
+  color: var(--color-text-primary);
+}
+
+/* Sizes */
+.btn-sm {
+  font-size: var(--text-body-xs);
+  padding: var(--space-2) var(--space-4);
+}
+.btn-lg {
+  font-size: var(--text-body-md);
+  padding: var(--space-4) var(--space-8);
+}
+```
+
+---
+
+### 8.3 Hero Section
+
+```
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│          Your beautiful freelance toolkit.           │  ← .t-hero, centered
+│       From sending proposals to getting paid.        │
+│                                                      │
+│     [short descriptor paragraph, .t-body-lead]       │
+│                                                      │
+│              [ Get started — btn-primary ]           │
+│                                                      │
+│   ┌─────────────────────────────────────────────┐   │
+│   │   [Browser chrome mockup / product screenshot]│   │
+│   └─────────────────────────────────────────────┘   │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+```css
+.hero {
+  text-align: center;
+  padding-top: var(--space-24);
+  padding-bottom: 0;
+}
+
+.hero-headline {
+  max-width: 700px;
+  margin-inline: auto;
+}
+
+.hero-body {
+  max-width: 520px;
+  margin-inline: auto;
+  margin-top: var(--space-6);
+  color: var(--color-text-secondary);
+}
+
+.hero-cta {
+  margin-top: var(--space-8);
+}
+
+/* Browser mockup wrapper */
+.hero-mockup {
+  margin-top: var(--space-12);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  /* subtle gradient fade at bottom */
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+.hero-mockup img {
+  width: 100%;
+  display: block;
+}
+```
+
+**Background treatment (hero):** Full-width gradient image (landscape photo — dusk mountains/sky in purple/orange tones) sits behind the hero area, fading into the page background color. Implemented as:
+
+```css
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("/hero-bg.jpg");
+  background-size: cover;
+  background-position: center top;
+  opacity: 0.18; /* very subtle */
+  z-index: -1;
+}
+```
+
+---
+
+### 8.4 Feature Checklist (2-col icon list)
+
+Used in the "Your projects deserve…" section.
+
+```
+  ✓ [Icon]  Feature one          ✓ [Icon]  Feature two
+  ✓ [Icon]  Feature three        ✓ [Icon]  Feature four
+```
+
+```css
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4) var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.feature-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* Icon circle */
+.feature-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.feature-icon.blue {
+  background: #eff6ff;
+  color: var(--color-icon-blue);
+}
+.feature-icon.green {
+  background: #f0fdf4;
+  color: var(--color-icon-green);
+}
+.feature-icon.purple {
+  background: #faf5ff;
+  color: var(--color-icon-purple);
+}
+.feature-icon.orange {
+  background: #fff7ed;
+  color: var(--color-icon-orange);
+}
+```
+
+---
+
+### 8.5 Feature Row (alternating text + UI screenshot)
+
+```
+Text side                      │   Screenshot/mockup side
+───────────────────────────────┼──────────────────────────
+[Eyebrow label]                │   ┌──────────────────┐
+Big section heading            │   │  Product UI shot  │
+                               │   │  (floating card)  │
+Body paragraph describing      │   └──────────────────┘
+the feature in plain terms.    │
+```
+
+```css
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-16);
+  align-items: center;
+  padding: var(--space-20) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Alternate layout every other row */
+.feature-row:nth-child(even) .feature-row-visual {
+  order: -1;
+}
+
+.feature-row-eyebrow {
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--color-accent);
+  margin-bottom: var(--space-3);
+}
+
+.feature-row-heading {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: var(--ls-tight);
+  margin-bottom: var(--space-5);
+}
+
+.feature-row-body {
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+
+/* Visual / mockup */
+.feature-row-visual {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.feature-row-visual img {
+  width: 100%;
+  display: block;
+}
+```
+
+---
+
+### 8.6 Icon Card (3-column feature grid)
+
+Used in the "Stop chasing clients" section with coloured emoji-style icons.
+
+```
+┌─────────────────┐
+│  🟠             │  ← colored circle icon, 40px
+│  Card heading   │
+│  Short body     │
+│  text here.     │
+└─────────────────┘
+```
+
+```css
+.icon-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.icon-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.icon-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: var(--space-2);
+}
+
+.icon-card-title {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.icon-card-body {
+  font-size: var(--text-body-sm);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+```
+
+---
+
+### 8.7 Steps / Process List
+
+Used in "Go from proposal to getting paid. Here's how."
+
+```
+  ① Select project type        ← numbered badge (filled circle)
+    One-line description.
+
+  ② Send link to client
+    ...
+```
+
+```css
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+}
+
+.step-item {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-body-xs);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-content-title {
+  font-size: var(--text-body-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.step-content-body {
+  font-size: var(--text-body-sm);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+```
+
+---
+
+### 8.8 Pricing Card
+
+```
+┌─────────────────────────────────┐
+│  Plan name          $XX/mo      │
+│  ─────────────────────────────  │
+│  ✓ Feature one                  │
+│  ✓ Feature two                  │
+│  ✓ Feature three                │
+│                                 │
+│        [ Get started ]          │
+└─────────────────────────────────┘
+```
+
+```css
+.pricing-card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pricing-card.featured {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 4px var(--color-accent-light),
+    var(--shadow-md);
+}
+
+.pricing-plan-name {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--color-text-secondary);
+}
+
+.pricing-price {
+  font-family: "ITC Garamond Book Narrow", serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: var(--ls-tight);
+  color: var(--color-text-primary);
+}
+
+.pricing-price span {
+  font-family: "Inter", sans-serif;
+  font-size: var(--text-body-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.pricing-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.pricing-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pricing-features li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.pricing-features li::before {
+  content: "✓";
+  color: var(--color-icon-green);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+```
+
+---
+
+### 8.9 Testimonial Card
+
+```css
+.testimonial-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.testimonial-quote {
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body);
+  color: var(--color-text-primary);
+}
+
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.testimonial-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.testimonial-name {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.testimonial-handle {
+  font-size: var(--text-body-xs);
+  color: var(--color-text-muted);
+}
+```
+
+---
+
+### 8.10 Badge / Tag
+
+```css
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.badge-accent {
+  background: var(--color-accent-light);
+  border-color: transparent;
+  color: #92400e;
+}
+
+.badge-green {
+  background: #f0fdf4;
+  border-color: transparent;
+  color: #166534;
+}
+```
+
+---
+
+### 8.11 Section Divider / Eyebrow
+
+```css
+/* Section eyebrow — small label above big headings */
+.eyebrow {
+  display: inline-block;
+  font-size: var(--text-body-xs);
+  font-weight: 600;
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+/* Centered section intro block */
+.section-intro {
+  text-align: center;
+  max-width: 600px;
+  margin-inline: auto;
+  margin-bottom: var(--space-16);
+}
+```
+
+---
+
+### 8.12 Footer
+
+```
+┌──────────────────────────────────────────────────────┐
+│  [Logo]   [Nav links ...............]  [Social icons] │
+│  ─────────────────────────────────────────────────── │
+│  © 2024 Portal  ·  Privacy  ·  Terms                 │
+└──────────────────────────────────────────────────────┘
+```
+
+```css
+.footer {
+  background: var(--color-dark-bg);
+  color: var(--color-dark-text);
+  padding: var(--space-16) 0 var(--space-8);
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-12);
+}
+
+.footer-nav {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.footer-nav a {
+  font-size: var(--text-body-sm);
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-nav a:hover {
+  color: #fff;
+}
+
+.footer-bottom {
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-body-xs);
+  color: rgba(255, 255, 255, 0.4);
+}
+```
+
+---
+
+### 8.13 CTA Banner (dark full-width)
+
+Bottom of page: dark background, centered headline, single CTA.
+
+```css
+.cta-banner {
+  background: var(--color-dark-bg);
+  color: var(--color-dark-text);
+  text-align: center;
+  padding: var(--space-24) var(--space-8);
+  border-radius: var(--radius-2xl);
+  margin: var(--space-20) 0;
+}
+
+.cta-banner .t-section-heading {
+  color: #fff;
+}
+
+.cta-banner .t-body-lead {
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 480px;
+  margin-inline: auto;
+  margin-top: var(--space-4);
+}
+
+.cta-banner .btn-primary {
+  margin-top: var(--space-8);
+}
+```
+
+---
+
+## 9. Motion & Animation
+
+```css
+/* Reduced motion override — always include */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scroll-reveal base state */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Staggered children */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.reveal-stagger.visible > *:nth-child(1) {
+  transition-delay: 0ms;
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger.visible > *:nth-child(2) {
+  transition-delay: 80ms;
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger.visible > *:nth-child(3) {
+  transition-delay: 160ms;
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger.visible > *:nth-child(4) {
+  transition-delay: 240ms;
+  opacity: 1;
+  transform: none;
+}
+
+/* Hover lift for cards */
+.hover-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+```
+
+```js
+// Intersection observer for .reveal elements
+const observer = new IntersectionObserver(
+  (entries) =>
+    entries.forEach(
+      (e) => e.isIntersecting && e.target.classList.add("visible"),
+    ),
+  { threshold: 0.1, rootMargin: "0px 0px -40px 0px" },
+);
+
+document
+  .querySelectorAll(".reveal, .reveal-stagger")
+  .forEach((el) => observer.observe(el));
+```
+
+---
+
+## 10. Page Section Map
+
+| #   | Section                   | Layout pattern                                      |
+| --- | ------------------------- | --------------------------------------------------- |
+| 1   | Nav                       | Sticky, backdrop-blur                               |
+| 2   | Hero                      | Centered text + browser mockup below, dusk BG image |
+| 3   | Feature intro             | Centered headline + 2×3 icon checklist              |
+| 4   | Value prop copy block     | Centered headline, 2-col body                       |
+| 5   | Feature rows ×4           | Alternating text-left / image-right                 |
+| 6   | Pain → solution           | Centered headline + 3-col icon cards                |
+| 7   | Showcase / portal gallery | Full-bleed horizontal card scroll                   |
+| 8   | How it works              | Centered headline + numbered steps list             |
+| 9   | Pricing                   | Centered headline + 2–3 col pricing cards           |
+| 10  | Testimonials              | 2-col testimonial cards                             |
+| 11  | CTA banner                | Dark full-width, centered                           |
+| 12  | Footer                    | Dark bg, 3-col nav                                  |
+
+---
+
+## 11. CSS Custom Properties — Full Master Token File
+
+```css
+/* portal-tokens.css — import this first */
 :root {
-  /* Colors */
-  --color-signal-blue: #007aff;
-  --color-ink-black: #000000;
-  --color-graphite: #3e3e3e;
-  --color-smoke: #636363;
-  --color-paper-white: #ffffff;
-  --color-ash-mist: #f7f7f7;
-  --color-dusk-gradient: #7a7fd4;
-  --gradient-dusk-gradient: linear-gradient(
-    180deg,
-    #4a7ff2 0%,
-    #7b7ed8 30%,
-    #c98ab5 65%,
-    #e8a87c 100%
-  );
+  /* Color */
+  --color-bg: #f5f5f0;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f0f0ea;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+  --color-accent: #f5a623;
+  --color-accent-hover: #e09510;
+  --color-accent-light: #fef3dc;
+  --color-icon-blue: #3b82f6;
+  --color-icon-green: #22c55e;
+  --color-icon-purple: #a855f7;
+  --color-icon-orange: #f97316;
+  --color-border: #e5e5e0;
+  --color-border-strong: #cccccc;
+  --color-dark-bg: #0f0f0f;
+  --color-dark-text: #ffffff;
 
-  /* Typography — Font Families */
-  --font-perfectly-nineties-regular:
-    "Perfectly Nineties Regular", ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter:
-    "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
-  --font-system-sans-serif:
-    "System sans-serif", ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Type scale */
+  --text-display-xl: clamp(2.75rem, 6vw, 4.5rem);
+  --text-display-lg: clamp(2rem, 4vw, 3rem);
+  --text-display-md: clamp(1.5rem, 3vw, 2.25rem);
+  --text-body-lg: 1.125rem;
+  --text-body-md: 1rem;
+  --text-body-sm: 0.875rem;
+  --text-body-xs: 0.75rem;
 
-  /* Typography — Scale */
-  --text-micro: 10px;
-  --leading-micro: 1.2;
-  --tracking-micro: -0.2px;
-  --text-caption: 12px;
-  --leading-caption: 1.2;
-  --tracking-caption: -0.24px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.3;
-  --tracking-body-sm: -0.28px;
-  --text-body: 16px;
-  --leading-body: 1.35;
-  --tracking-body: -0.32px;
-  --text-heading-sm: 18px;
-  --leading-heading-sm: 1.35;
-  --tracking-heading-sm: -0.36px;
-  --text-heading: 36px;
-  --leading-heading: 1;
-  --text-display: 48px;
-  --leading-display: 1;
+  /* Line heights */
+  --lh-display: 1.1;
+  --lh-body: 1.65;
+  --lh-ui: 1.4;
 
-  /* Typography — Weights */
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
+  /* Letter spacing */
+  --ls-tight: -0.02em;
+  --ls-normal: 0;
+  --ls-wide: 0.05em;
 
   /* Spacing */
-  --spacing-4: 4px;
-  --spacing-5: 5px;
-  --spacing-6: 6px;
-  --spacing-8: 8px;
-  --spacing-10: 10px;
-  --spacing-12: 12px;
-  --spacing-14: 14px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-45: 45px;
-  --spacing-60: 60px;
-  --spacing-80: 80px;
-  --spacing-100: 100px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+  --section-padding-y: clamp(64px, 10vw, 120px);
 
   /* Layout */
-  --page-max-width: 1200px;
-  --section-gap: 80-120px;
-  --card-padding: 20px;
-  --element-gap: 10px;
+  --container-max: 1120px;
+  --container-gutter: clamp(16px, 5vw, 48px);
 
-  /* Border Radius */
-  --radius-md: 7px;
-  --radius-2xl: 16px;
-  --radius-2xl-2: 22px;
-  --radius-3xl: 26px;
-  --radius-3xl-2: 30px;
-  --radius-3xl-3: 40px;
-  --radius-full: 50px;
-
-  /* Named Radii */
-  --radius-nav: 22px;
-  --radius-cards: 22-30px;
-  --radius-badges: 50px;
-  --radius-images: 30-40px;
-  --radius-buttons: 50px;
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-subtle: rgb(247, 247, 247) 0px 0px 0px 5px;
-  --shadow-subtle-2:
-    rgba(255, 255, 255, 0.6) 0px 0.5px 0px 0.5px inset,
-    rgba(255, 255, 255, 0.4) 0px 0px 30px 0px inset,
-    rgba(255, 255, 255, 0.8) 0px 0px 12px 0px inset;
-  --shadow-subtle-3: rgba(255, 255, 255, 0.6) 0px 0.5px 0px 0.5px inset;
-  --shadow-subtle-4: rgb(247, 247, 247) 0px 0px 0px 1px;
-  --shadow-subtle-5:
-    rgb(255, 255, 255) 0px 1px 0px 0px inset,
-    rgba(0, 0, 0, 0.15) 0px 0px 0px 1px, rgba(0, 0, 0, 0.06) 0px 3px 2px 0px;
-  --shadow-subtle-6: rgb(140, 194, 255) 0px 1px 0px 1px inset;
-
-  /* Surfaces */
-  --surface-page-canvas: #f7f7f7;
-  --surface-card-surface: #ffffff;
-  --surface-nav-pill: #ffffff;
-  --surface-hero-atmosphere: #7a7fd4;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 ```
 
-### Tailwind v4
+---
 
-```css
-@theme {
-  /* Colors */
-  --color-signal-blue: #007aff;
-  --color-ink-black: #000000;
-  --color-graphite: #3e3e3e;
-  --color-smoke: #636363;
-  --color-paper-white: #ffffff;
-  --color-ash-mist: #f7f7f7;
-  --color-dusk-gradient: #7a7fd4;
-
-  /* Typography */
-  --font-perfectly-nineties-regular:
-    "Perfectly Nineties Regular", ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-inter:
-    "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
-  --font-system-sans-serif:
-    "System sans-serif", ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-
-  /* Typography — Scale */
-  --text-micro: 10px;
-  --leading-micro: 1.2;
-  --tracking-micro: -0.2px;
-  --text-caption: 12px;
-  --leading-caption: 1.2;
-  --tracking-caption: -0.24px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.3;
-  --tracking-body-sm: -0.28px;
-  --text-body: 16px;
-  --leading-body: 1.35;
-  --tracking-body: -0.32px;
-  --text-heading-sm: 18px;
-  --leading-heading-sm: 1.35;
-  --tracking-heading-sm: -0.36px;
-  --text-heading: 36px;
-  --leading-heading: 1;
-  --text-display: 48px;
-  --leading-display: 1;
-
-  /* Spacing */
-  --spacing-4: 4px;
-  --spacing-5: 5px;
-  --spacing-6: 6px;
-  --spacing-8: 8px;
-  --spacing-10: 10px;
-  --spacing-12: 12px;
-  --spacing-14: 14px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-45: 45px;
-  --spacing-60: 60px;
-  --spacing-80: 80px;
-  --spacing-100: 100px;
-
-  /* Border Radius */
-  --radius-md: 7px;
-  --radius-2xl: 16px;
-  --radius-2xl-2: 22px;
-  --radius-3xl: 26px;
-  --radius-3xl-2: 30px;
-  --radius-3xl-3: 40px;
-  --radius-full: 50px;
-
-  /* Shadows */
-  --shadow-subtle: rgb(247, 247, 247) 0px 0px 0px 5px;
-  --shadow-subtle-2:
-    rgba(255, 255, 255, 0.6) 0px 0.5px 0px 0.5px inset,
-    rgba(255, 255, 255, 0.4) 0px 0px 30px 0px inset,
-    rgba(255, 255, 255, 0.8) 0px 0px 12px 0px inset;
-  --shadow-subtle-3: rgba(255, 255, 255, 0.6) 0px 0.5px 0px 0.5px inset;
-  --shadow-subtle-4: rgb(247, 247, 247) 0px 0px 0px 1px;
-  --shadow-subtle-5:
-    rgb(255, 255, 255) 0px 1px 0px 0px inset,
-    rgba(0, 0, 0, 0.15) 0px 0px 0px 1px, rgba(0, 0, 0, 0.06) 0px 3px 2px 0px;
-  --shadow-subtle-6: rgb(140, 194, 255) 0px 1px 0px 1px inset;
-}
-```
+_End of Portal design system · generated June 2026_
