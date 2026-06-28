@@ -18,7 +18,7 @@ export default function Footer() {
                         <div className="lg:col-span-3 space-y-6">
                             {/* Saral AI Logo SVG or Text */}
                             <a href="/" className="block">
-                                <h2 className="text-2xl font-bold tracking-tight">Saral AI</h2>
+                                <h2 className="text-2xl font-bold tracking-tight font-display" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>Saral AI</h2>
                             </a>
                             <p className="text-sm/6 text-neutral-600 max-w-96">
                                 Saral AI provides zero-friction voice automation and instant WhatsApp lead capture to ensure Indian businesses never miss a customer again.
@@ -28,7 +28,7 @@ export default function Footer() {
                         <div className="lg:col-span-3 flex lg:justify-end items-start">
                             {/* Platform */}
                             <div>
-                                <h3 className="font-medium text-sm mb-4">Platform</h3>
+                                <h3 className="font-bold text-base mb-4 text-neutral-900 font-display" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>Platform</h3>
                                 <ul className="space-y-3 text-sm text-neutral-800">
                                     <li><a href="#" className="hover:text-neutral-700">Voice Engine</a></li>
                                     <li><a href="#" className="hover:text-neutral-700">Dashboard</a></li>
@@ -45,7 +45,7 @@ export default function Footer() {
                     </div>
                     <div className="relative">
                         <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-64 bg-slate-100 rounded-full blur-[100px] pointer-events-none"/>
-                        <h1 className="text-center font-extrabold leading-[0.7] text-transparent text-[clamp(3rem,15vw,15rem)] [-webkit-text-stroke:1px_#D4D4D4] mt-6 relative z-0">
+                        <h1 className="text-center font-extrabold leading-[0.7] text-transparent text-[clamp(3rem,15vw,15rem)] [-webkit-text-stroke:1px_#D4D4D4] mt-6 relative z-0 font-sans">
                             SARAL AI
                         </h1>
                     </div>
