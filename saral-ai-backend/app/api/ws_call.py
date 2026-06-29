@@ -253,8 +253,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 llm_reply = None
                 try:
                     llm_reply = await asyncio.wait_for(
-                        run_in_threadpool(get_response, transcript, conversation_history[:-1], system_prompt),
-                        timeout=2.0
+                        run_in_threadpool(get_response, transcript, conversation_history[:-1], system_prompt, user_id),
+                        timeout=4.0
                     )
                 except asyncio.TimeoutError as te:
                     logger.error(f"LLM Timeout Error on first attempt: {str(te)}", exc_info=True)
@@ -271,8 +271,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     shorter_transcript = transcript[:50] if len(transcript) > 50 else transcript
                     try:
                         llm_reply = await asyncio.wait_for(
-                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1], system_prompt),
-                            timeout=2.0
+                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1], system_prompt, user_id),
+                            timeout=3.0
                         )
                         logger.info(f"LLM Reply on retry: {llm_reply}")
                     except asyncio.TimeoutError as te:

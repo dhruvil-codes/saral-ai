@@ -54,11 +54,22 @@ CREATE TABLE IF NOT EXISTS leads (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Bookings Table
+CREATE TABLE IF NOT EXISTS bookings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    slot_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'confirmed', -- e.g., 'confirmed', 'cancelled'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT unique_user_slot UNIQUE (user_id, slot_datetime)
+);
+
 -- Create index on foreign keys for optimization
 CREATE INDEX IF NOT EXISTS idx_faqs_user_id ON faqs(user_id);
 CREATE INDEX IF NOT EXISTS idx_call_logs_user_id ON call_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_leads_call_log_id ON leads(call_log_id);
 CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
 
 -- Setup automatic updated_at trigger for faqs
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -135,3 +146,18 @@ class Lead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class BookingCreate(BaseModel):
+    user_id: UUID
+    slot_datetime: datetime
+    status: Optional[str] = "confirmed"
+
+class Booking(BaseModel):
+    id: UUID
+    user_id: UUID
+    slot_datetime: datetime
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
