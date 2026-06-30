@@ -577,12 +577,12 @@
       "updated": 1700000000000,
       "link": null,
       "locked": false,
-      "text": "auth.py -> JWT, user registrations, login\nfaqs.py -> FAQ CRUD (MSME Context)",
+      "text": "auth.py -> JWT, user registrations, login\nfaqs.py -> FAQ CRUD (MSME Context)\nfaq_worker.py -> Stale FAQ scheduler",
       "fontSize": 12,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "originalText": "auth.py -> JWT, user registrations, login\nfaqs.py -> FAQ CRUD (MSME Context)",
+      "originalText": "auth.py -> JWT, user registrations, login\nfaqs.py -> FAQ CRUD (MSME Context)\nfaq_worker.py -> Stale FAQ scheduler",
       "lineHeight": 1.25
     },
     {
@@ -1445,12 +1445,12 @@
       "updated": 1700000000000,
       "link": null,
       "locked": false,
-      "text": "Twilio / Celery (TODO)",
+      "text": "Twilio WhatsApp Integration",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "originalText": "Twilio / Celery (TODO)",
+      "originalText": "Twilio WhatsApp Integration",
       "lineHeight": 1.25
     },
     {

@@ -130,34 +130,48 @@ async def login(body: LoginRequest):
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
+    supabase = get_supabase()
+    
+    # 1. Attempt to authenticate using local custom JWT first
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         user_id: str = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token structure"
-            )
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
+        if user_id is not None:
+            # fetch user from Supabase public.users table
+            response = supabase.table("users").select("*").eq("id", user_id).execute()
+            if response.data:
+                return response.data[0]
+    except Exception:
+        # Fallback to Supabase Auth token
+        pass
 
-    # fetch user from Supabase
-    supabase = get_supabase()
+    # 2. Attempt to authenticate using Supabase native JWT
     try:
-        response = supabase.table("users").select("*").eq("id", user_id).execute()
-        if not response.data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-        return response.data[0]
-    except HTTPException:
-        raise
+        auth_resp = supabase.auth.get_user(token)
+        if auth_resp and auth_resp.user:
+            supabase_user = auth_resp.user
+            user_id = str(supabase_user.id)
+            
+            # Check if this user exists in our public.users table
+            response = supabase.table("users").select("*").eq("id", user_id).execute()
+            if response.data:
+                return response.data[0]
+            else:
+                # If they are logged in via Supabase but don't have a record in users, create one
+                user_data = {
+                    "id": user_id,
+                    "email": supabase_user.email,
+                    "password_hash": "supabase_auth", # placeholder since auth is delegated
+                    "business_name": "My Business",
+                    "whatsapp_number": ""
+                }
+                insert_response = supabase.table("users").insert(user_data).execute()
+                if insert_response.data:
+                    return insert_response.data[0]
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error: {str(e)}"
-        )
+        logger.error(f"Supabase JWT auth failed: {e}")
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired authentication token"
+    )

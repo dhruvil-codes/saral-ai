@@ -109,3 +109,53 @@ class TestOptimizations(unittest.TestCase):
             # Third is system_prompt
             self.assertEqual(args[0], "Where are you located?")
             self.assertIn("Mumbai, India", args[2]) # FAQ must be in system prompt!
+
+    @patch("app.api.ws_call.speech_to_text")
+    @patch("app.api.ws_call.semantic_cache")
+    @patch("app.api.ws_call.get_relevant_faqs")
+    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.text_to_speech_stream")
+    def test_websocket_rag_stale_injection(self, mock_tts_stream, mock_llm, mock_faqs, mock_cache, mock_stt):
+        # Configure mocks
+        mock_stt.return_value = "What is the fee?"
+        
+        async def mock_lookup(text, language):
+            return None # Cache miss
+        mock_cache.lookup.side_effect = mock_lookup
+        
+        async def mock_embed(text):
+            return MagicMock(tolist=lambda: [0.1] * 384)
+        mock_cache.embed_text.side_effect = mock_embed
+        
+        async def mock_get_faqs(emb, user_id):
+            return [
+                {
+                    "question": "What is the fee?",
+                    "answer": "The fee is ₹500 for entry.",
+                    "last_updated": "2026-05-15T10:00:00+00:00", # > 30 days old from current 2026-06-30
+                    "needs_verification": False
+                }
+            ]
+        mock_faqs.side_effect = mock_get_faqs
+        
+        mock_llm.return_value = "The entry fee is 500 rupees, but please verify with the owner."
+        
+        async def mock_stream(text, lang):
+            yield b"synthesized-audio"
+        mock_tts_stream.side_effect = mock_stream
+        
+        with self.client.websocket_connect("/ws/call?user_id=test-user-123") as websocket:
+            websocket.send_bytes(b"input-audio")
+            websocket.receive_json() # status: transcribed
+            websocket.receive_json() # status: tts_start
+            websocket.receive_bytes() # audio
+            websocket.receive_json() # status: tts_end
+            
+            # Verify RAG call and FAQ injection
+            mock_faqs.assert_called_once()
+            args, kwargs = mock_llm.call_args
+            # Third arg is system_prompt
+            system_prompt = args[2]
+            self.assertIn("SYSTEM NOTE: This information is from 2026-05-15", system_prompt)
+            self.assertIn("The fee is listed as ₹500", system_prompt)
+

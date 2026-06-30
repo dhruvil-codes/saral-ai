@@ -21,8 +21,37 @@ from app.services.supabase_db import get_relevant_faqs
 from app.db.supabase_client import get_supabase
 from app.services.whatsapp import send_post_call_summary
 
+import re
+from datetime import timedelta
+
 # Configure logger
 logger = logging.getLogger(__name__)
+
+def extract_amount(text: str) -> str:
+    match = re.search(r'(?:Rs\.?|₹|rupees|INR)\s*[\d,]+(?:\.\d+)?', text, re.IGNORECASE)
+    if match:
+        return match.group(0)
+    match = re.search(r'[\d,]+(?:\.\d+)?\s*(?:rupees|rs|INR|₹)', text, re.IGNORECASE)
+    if match:
+        return match.group(0)
+    match = re.search(r'[\d,]+(?:\.\d+)?', text)
+    if match:
+        return match.group(0)
+    return "the listed amount"
+
+def parse_last_updated(val) -> datetime:
+    if not val:
+        return datetime.now(timezone.utc)
+    if isinstance(val, datetime):
+        return val
+    try:
+        if isinstance(val, str):
+            if val.endswith('Z'):
+                val = val[:-1] + '+00:00'
+            return datetime.fromisoformat(val)
+    except Exception:
+        pass
+    return datetime.now(timezone.utc)
 
 router = APIRouter()
 
@@ -237,10 +266,31 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         emb = await semantic_cache.embed_text(transcript)
                         faqs = await get_relevant_faqs(emb.tolist(), user_id)
                         if faqs:
-                            faq_context = "\n".join([
-                                f"- Question: {f['question']}\n  Answer: {f['answer']}"
-                                for f in faqs
-                            ])
+                            faq_items = []
+                            for f in faqs:
+                                item_str = f"- Question: {f['question']}\n  Answer: {f['answer']}"
+                                
+                                # Freshness Check:
+                                last_updated_val = f.get("last_updated")
+                                last_updated_dt = parse_last_updated(last_updated_val)
+                                if last_updated_dt.tzinfo is None:
+                                    last_updated_dt = last_updated_dt.replace(tzinfo=timezone.utc)
+                                
+                                now_dt = datetime.now(timezone.utc)
+                                age_days = (now_dt - last_updated_dt).days
+                                
+                                text_to_check = (f.get("question", "") + " " + f.get("answer", "")).lower()
+                                high_risk_keywords = ["price", "fee", "cost", "rupees", "₹", "time", "hours"]
+                                has_keyword = any(kw in text_to_check for kw in high_risk_keywords)
+                                
+                                if age_days > 30 and has_keyword:
+                                    last_updated_date = last_updated_dt.strftime("%Y-%m-%d")
+                                    amount = extract_amount(f.get("answer", ""))
+                                    item_str += f"\n  [SYSTEM NOTE: This information is from {last_updated_date}. You MUST tell the user: \"The fee is listed as {amount}, but please verify with the owner as this might have changed recently.\"]"
+                                
+                                faq_items.append(item_str)
+                                
+                            faq_context = "\n".join(faq_items)
                             system_prompt = f"You are a helpful receptionist AI assistant for Saral AI.\n\nUse the following relevant business FAQs to answer the user's question:\n{faq_context}"
                             logger.info(f"RAG: Injected {len(faqs)} relevant FAQs into system prompt.")
                     except Exception as rag_err:

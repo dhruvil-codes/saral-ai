@@ -30,12 +30,14 @@ class FAQResponse(BaseModel):
     id: UUID
     question: str
     answer: str
+    last_updated: datetime
+    needs_verification: bool
 
 @router.get("/faqs", response_model=List[FAQResponse])
 async def get_faqs(current_user: dict = Depends(get_current_user)):
     supabase = get_supabase()
     try:
-        response = supabase.table("faqs").select("id, question, answer").eq("user_id", current_user["id"]).execute()
+        response = supabase.table("faqs").select("id, question, answer, last_updated, needs_verification").eq("user_id", current_user["id"]).execute()
         return response.data
     except Exception as e:
         raise HTTPException(
@@ -58,7 +60,9 @@ async def create_faq(body: FAQCreate, current_user: dict = Depends(get_current_u
     faq_data = {
         "user_id": current_user["id"],
         "question": body.question,
-        "answer": body.answer
+        "answer": body.answer,
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "needs_verification": False
     }
     if embedding_list is not None:
         faq_data["embedding"] = embedding_list
@@ -113,7 +117,9 @@ async def update_faq(id: UUID, body: FAQUpdate, current_user: dict = Depends(get
     update_data = {
         "question": body.question,
         "answer": body.answer,
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "needs_verification": False
     }
     if embedding_list is not None:
         update_data["embedding"] = embedding_list

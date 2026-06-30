@@ -118,6 +118,8 @@ class FAQ(BaseModel):
     answer: str
     created_at: datetime
     updated_at: datetime
+    last_updated: datetime
+    needs_verification: bool
 
     model_config = ConfigDict(from_attributes=True)
 

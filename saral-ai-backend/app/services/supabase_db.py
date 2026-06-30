@@ -38,7 +38,7 @@ async def get_relevant_faqs(query_embedding: list, user_id: str, top_n: int = No
         #     match_count int,
         #     filter_user_id uuid
         # )
-        # returns table(id uuid, user_id uuid, question text, answer text, similarity float) ...
+        # returns table(id uuid, user_id uuid, question text, answer text, similarity float, last_updated timestamp with time zone, needs_verification boolean) ...
         #
         resp = supabase.rpc(
             "match_faqs",

@@ -32,9 +32,11 @@ graph TD
         auth_router["Auth Router<br/>(app/api/auth.py)"]:::gateway
         faq_router["FAQ Router<br/>(app/api/faqs.py)"]:::gateway
         ws_router["WS Router<br/>(app/api/ws_call.py)"]:::gateway
+        faq_worker["FAQ Worker Scheduler<br/>(app/workers/faq_worker.py)"]:::gateway
         
         vad["Voice Activity Detector<br/>(app/utils/vad.py)"]:::module
         fallback["Fallback Audio Cache<br/>(app/services/fallback_audio.py)"]:::module
+        whatsapp["WhatsApp Service<br/>(app/services/whatsapp.py)"]:::module
     end
 
     subgraph Data["Databases & Persistence"]
@@ -45,24 +47,30 @@ graph TD
     subgraph External["External AI APIs"]
         sarvam["Sarvam AI API<br/>(STT & TTS Stream)"]:::extService
         groq["Groq LLM Client<br/>(openai/gpt-oss-20b)"]:::extService
+        twilio["Twilio WhatsApp API"]:::extService
     end
 
     %% Connections
     REST_Client -->|REST Requests| main
     main --> auth_router
     main --> faq_router
+    main --> faq_worker
     WS_Client <-->|Bidirectional Audio Stream| ws_router
     
     auth_router --> supabase
     faq_router --> supabase
+    faq_worker -->|Checks stale FAQs| supabase
+    faq_worker -->|Dispatches Twilio alerts| whatsapp
     supabase --> postgres
     
     lifespan -->|Pre-caches default audios| fallback
+    lifespan -->|Starts Scheduler Loop| faq_worker
     ws_router <-->|Processes streaming PCM| vad
     ws_router <--|Retrieves failure clips| fallback
     
     ws_router -->|speech_to_text / text_to_speech_stream| sarvam
     ws_router -->|get_response| groq
+    whatsapp -->|Send Alert Messages| twilio
 ```
 
 ---
@@ -86,6 +94,8 @@ d:\saral-ai
 │   │   ├── core/
 │   │   │   └── config.py           # Pydantic Settings validation
 │   │   ├── db/
+│   │   │   ├── migrations/         # SQL database migrations
+│   │   │   │   └── 01_add_freshness_columns.sql
 │   │   │   ├── models.py           # Pydantic schema models & Postgres DDL definitions
 │   │   │   └── supabase_client.py  # Supabase client manager
 │   │   ├── services/               # AI & External integrations
@@ -93,9 +103,12 @@ d:\saral-ai
 │   │   │   ├── groq_llm.py         # Groq LLM integration client (using openai/gpt-oss-20b)
 │   │   │   ├── lead_extractor.py   # [TODO] Lead information extraction pipeline
 │   │   │   ├── sarvam.py           # Sarvam AI STT & Streaming TTS client
+│   │   │   └── whatsapp.py         # WhatsApp notification handler (via Twilio client)
 │   │   │   └── twilio_service.py   # [TODO] Outgoing Twilio client
 │   │   ├── utils/
 │   │   │   └── vad.py              # Voice Activity Detector (webrtcvad / RMS fallback)
+│   │   ├── workers/                # Background process schedulers
+│   │   │   └── faq_worker.py       # Daily stale FAQ checks & notifications
 │   │   └── main.py                 # FastAPI lifespan setup & entrypoint router configuration
 │   ├── requirements.txt            # Backend Python dependencies
 │   └── tests/                      # Automated test scripts
@@ -186,8 +199,10 @@ The data layer is hosted on Supabase (Postgres) and mapped using Pydantic models
 | email (TEXT, UNIQUE)               | <----+| user_id (UUID, FK -> users)        |
 | password_hash (TEXT)               |       | question (TEXT)                    |
 | business_name (TEXT)               |       | answer (TEXT)                      |
-| whatsapp_number (TEXT)             |       | created_at (TIMESTAMP)             |
-| created_at (TIMESTAMP)             |       | updated_at (TIMESTAMP)             |
+| whatsapp_number (TEXT)             |       | last_updated (TIMESTAMP WITH TZ)   |
+| created_at (TIMESTAMP)             |       | needs_verification (BOOLEAN)       |
+|                                    |       | created_at (TIMESTAMP)             |
+|                                    |       | updated_at (TIMESTAMP)             |
 +------------------------------------+       +------------------------------------+
                   |
                   |                                           
