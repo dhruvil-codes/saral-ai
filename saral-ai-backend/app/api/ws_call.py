@@ -303,7 +303,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 llm_reply = None
                 try:
                     llm_reply = await asyncio.wait_for(
-                        run_in_threadpool(get_response, transcript, conversation_history[:-1], system_prompt, user_id),
+                        run_in_threadpool(get_response, transcript, conversation_history[:-1], system_prompt, user_id, call_id),
                         timeout=4.0
                     )
                 except asyncio.TimeoutError as te:
@@ -321,7 +321,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     shorter_transcript = transcript[:50] if len(transcript) > 50 else transcript
                     try:
                         llm_reply = await asyncio.wait_for(
-                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1], system_prompt, user_id),
+                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1], system_prompt, user_id, call_id),
                             timeout=3.0
                         )
                         logger.info(f"LLM Reply on retry: {llm_reply}")
@@ -453,6 +453,31 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
         logger.error(f"Unexpected error in websocket session: {str(e)}", exc_info=True)
     finally:
         logger.info("WebSocket call session finished. Cleaning up.")
+        
+        # Check for any pending bookings made during this call session to trigger recovery
+        if call_id and user_id:
+            try:
+                supabase = get_supabase()
+                pending_res = supabase.table("bookings")\
+                    .select("id, slot_datetime, status, call_id")\
+                    .eq("call_id", str(call_id))\
+                    .eq("status", "pending")\
+                    .execute()
+                
+                if pending_res.data:
+                    logger.info(f"Found pending booking slot for call_id={call_id}. Fetching caller number for recovery.")
+                    existing_res = supabase.table("call_logs").select("caller_number").eq("id", call_id).execute()
+                    caller_number = "unknown"
+                    if existing_res.data:
+                        caller_number = existing_res.data[0].get("caller_number", "unknown")
+                    
+                    if caller_number and caller_number != "unknown":
+                        from app.workers.tasks import send_dropped_call_recovery_whatsapp
+                        logger.info(f"Triggering background task send_dropped_call_recovery_whatsapp for {caller_number}")
+                        asyncio.create_task(send_dropped_call_recovery_whatsapp(caller_number))
+            except Exception as recovery_err:
+                logger.error(f"Failed to check pending bookings or trigger recovery task: {recovery_err}", exc_info=True)
+
         # Perform post-call updates
         if conversation_history:
             # 1. Compile the full transcript
