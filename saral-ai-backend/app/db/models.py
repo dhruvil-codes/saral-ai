@@ -152,14 +152,19 @@ class Lead(BaseModel):
 class BookingCreate(BaseModel):
     user_id: UUID
     slot_datetime: datetime
-    status: Optional[str] = "confirmed"
+    status: Optional[str] = "pending"
+    expires_at: Optional[datetime] = None
+    call_id: Optional[UUID] = None
 
 class Booking(BaseModel):
     id: UUID
     user_id: UUID
     slot_datetime: datetime
     status: str
+    expires_at: Optional[datetime] = None
+    call_id: Optional[UUID] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
