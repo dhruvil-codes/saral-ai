@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 import httpx
 from groq import Groq, GroqError, APITimeoutError, APIStatusError
-from app.api.bookings import create_booking_slot
+from app.api.bookings import hold_booking_slot, confirm_booking_slot
 
 # Load environment variables from .env if present
 load_dotenv()
@@ -22,14 +22,31 @@ BOOKING_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "book_appointment",
-            "description": "Book an appointment time slot for the caller.",
+            "name": "hold_appointment_slot",
+            "description": "Temporarily hold/reserve an appointment slot for the caller in pending status for 10 minutes.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "slot_datetime": {
                         "type": "string",
                         "description": "ISO formatted date and time for the appointment slot (e.g. 2026-06-30T10:00:00Z)."
+                    }
+                },
+                "required": ["slot_datetime"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "confirm_appointment",
+            "description": "Confirm a previously held/pending appointment slot.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "slot_datetime": {
+                        "type": "string",
+                        "description": "ISO formatted date and time for the appointment slot to confirm (e.g. 2026-06-30T10:00:00Z)."
                     }
                 },
                 "required": ["slot_datetime"]
@@ -42,7 +59,8 @@ def get_response(
     user_message: str,
     conversation_history: List[Dict[str, Any]],
     system_prompt: str = None,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    call_id: Optional[str] = None
 ) -> str:
     """
     Sends the full conversation history plus the new user message to Groq and returns the assistant's reply.
@@ -53,6 +71,7 @@ def get_response(
         conversation_history (list): A list of dicts representing the conversation history.
         system_prompt (str): Optional system prompt overrides/extensions.
         user_id (str): Optional UUID string of the business user for database booking.
+        call_id (str): Optional UUID string of the call log session.
 
     Returns:
         str: The response text from the assistant.
@@ -81,10 +100,22 @@ def get_response(
             })
 
     # Ensure system prompt accurately directs booking behavior
-    default_sys = "You are a helpful receptionist AI assistant for Saral AI. If the caller wants to book or reserve an appointment, call the book_appointment tool with their requested slot."
+    default_sys = (
+        "You are a helpful receptionist AI assistant for Saral AI. "
+        "If the caller wants to book or reserve an appointment, you must first call the hold_appointment_slot tool to check and temporarily hold the slot. "
+        "After calling hold_appointment_slot, you MUST explicitly read back the critical information (date, time, and caller phone number if known) and ask for confirmation. "
+        "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', 'correct', 'haan', or confirms) after you read back the details."
+    )
     sys_content = system_prompt or default_sys
-    if user_id and "book_appointment" not in sys_content:
-        sys_content += "\nIf the caller requests an appointment booking, use the book_appointment tool to check and reserve the slot."
+    
+    booking_instructions = (
+        "\n\n[CRITICAL APPOINTMENT BOOKING RULES]:\n"
+        "1. If the caller wants to book or reserve an appointment, you must first call the hold_appointment_slot tool with the requested slot.\n"
+        "2. After calling hold_appointment_slot, you MUST explicitly read back the critical information (date, time, and caller phone number if known) to confirm with the caller. E.g., 'Just to confirm — Tuesday 15th at 10am, phone number 9820XXXXXX — is that correct?'\n"
+        "3. Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', 'correct', 'haan', or confirms) after you read back the details."
+    )
+    if user_id and "[CRITICAL APPOINTMENT BOOKING RULES]" not in sys_content:
+        sys_content += booking_instructions
     
     system_index = -1
     for i, m in enumerate(messages):
@@ -123,20 +154,23 @@ def get_response(
         # Check if the model triggered a tool call
         if getattr(choice_msg, "tool_calls", None):
             for tool_call in choice_msg.tool_calls:
-                if tool_call.function.name == "book_appointment":
+                tool_name = tool_call.function.name
+                if tool_name in ["hold_appointment_slot", "confirm_appointment"]:
                     try:
                         args = json.loads(tool_call.function.arguments)
                         slot_dt = args.get("slot_datetime")
                     except Exception:
                         slot_dt = None
 
-                    logger.info(f"LLM requested booking tool call for slot: {slot_dt}")
+                    logger.info(f"LLM requested booking tool call '{tool_name}' for slot: {slot_dt}")
 
-                    # Step 3 Execution: Perform DB write FIRST before verbal confirmation!
                     if slot_dt and user_id:
-                        db_result = create_booking_slot(user_id=user_id, slot_datetime=slot_dt)
+                        if tool_name == "hold_appointment_slot":
+                            db_result = hold_booking_slot(user_id=user_id, slot_datetime=slot_dt, call_id=call_id)
+                        else:
+                            db_result = confirm_booking_slot(user_id=user_id, slot_datetime=slot_dt)
                     else:
-                        db_result = {"success": False, "error": "INVALID_SLOT", "message": "Missing slot datetime"}
+                        db_result = {"success": False, "error": "INVALID_SLOT", "message": "Missing slot datetime or user ID"}
 
                     # Append assistant tool call message to history
                     messages.append({
@@ -156,15 +190,27 @@ def get_response(
 
                     # Construct tool outcome message
                     if db_result["success"]:
-                        tool_output = json.dumps({
-                            "status": "success",
-                            "message": f"Appointment successfully booked for {slot_dt}."
-                        })
+                        if tool_name == "hold_appointment_slot":
+                            tool_output = json.dumps({
+                                "status": "success",
+                                "message": f"Appointment slot {slot_dt} is now held as pending for 10 minutes."
+                            })
+                        else:
+                            tool_output = json.dumps({
+                                "status": "success",
+                                "message": f"Appointment slot {slot_dt} has been successfully confirmed."
+                            })
                     elif db_result.get("error") == "SLOT_TAKEN":
                         tool_output = json.dumps({
                             "status": "error",
                             "reason": "SLOT_TAKEN",
-                            "message": "The requested slot is already taken by another booking."
+                            "message": "The requested slot is already taken or held by another booking."
+                        })
+                    elif db_result.get("error") == "NO_PENDING_SLOT":
+                        tool_output = json.dumps({
+                            "status": "error",
+                            "reason": "NO_PENDING_SLOT",
+                            "message": "No pending reservation was found for this time slot. It may have expired."
                         })
                     else:
                         tool_output = json.dumps({
@@ -188,6 +234,7 @@ def get_response(
                         return followup_completion.choices[0].message.content
 
         return choice_msg.content or ""
+
     except APITimeoutError as te:
         raise httpx.TimeoutException(f"Groq LLM timeout: {str(te)}") from te
     except APIStatusError as se:
