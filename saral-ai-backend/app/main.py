@@ -2,7 +2,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
-from app.api import auth, faqs, ws_call, calls, bookings
+from app.api import auth, faqs, ws_call, calls, bookings, callback
 from app.api.auth import get_current_user
 from app.workers import faq_worker
 import asyncio
@@ -48,6 +48,7 @@ app.include_router(auth.router, prefix="/api/auth")
 app.include_router(faqs.router, prefix="/api")
 app.include_router(calls.router, prefix="/api")
 app.include_router(bookings.router, prefix="/api")
+app.include_router(callback.router, prefix="/api")
 app.include_router(faq_worker.router, prefix="/api")
 app.include_router(ws_call.router)
 
