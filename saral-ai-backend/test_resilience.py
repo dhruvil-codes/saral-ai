@@ -134,12 +134,27 @@ with patch('app.db.supabase_client.get_supabase', return_value=MockSupabaseClien
 class TestResilienceFeatures(unittest.TestCase):
 
     def setUp(self):
+        # Patch get_supabase during test execution to override any cached imports
+        self.patchers = [
+            patch('app.db.supabase_client.get_supabase', return_value=MockSupabaseClient()),
+            patch('app.api.ws_call.get_supabase', return_value=MockSupabaseClient()),
+            patch('app.api.bookings.get_supabase', return_value=MockSupabaseClient()),
+            patch('app.api.callback.get_supabase', return_value=MockSupabaseClient()),
+        ]
+        for p in self.patchers:
+            p.start()
+
         # Reset database tables
         mock_db["bookings"] = []
         mock_db["call_logs"] = []
         mock_db["users"] = [
             {"id": "user-uuid-123", "email": "test@business.com", "whatsapp_number": "+919999999999"}
         ]
+
+    def tearDown(self):
+        for p in self.patchers:
+            p.stop()
+
 
     def test_hold_and_confirm_booking_logic(self):
         """Test hold_booking_slot writes pending and confirm_booking_slot updates to confirmed."""
