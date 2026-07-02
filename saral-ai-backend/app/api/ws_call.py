@@ -20,12 +20,38 @@ from app.services.intent_cache import semantic_cache
 from app.services.supabase_db import get_relevant_faqs
 from app.db.supabase_client import get_supabase
 from app.services.whatsapp import send_post_call_summary
+from app.core.config import settings
 
 import re
 from datetime import timedelta
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket) -> bool:
+        max_concurrent = settings.MAX_CONCURRENT_CALLS
+        if len(self.active_connections) >= max_concurrent:
+            logger.warning(f"Connection rejected: current active connections ({len(self.active_connections)}) >= max limit ({max_concurrent})")
+            await websocket.accept()
+            await websocket.close(code=1013)  # 1013: Try Again Later / Busy Signal
+            return False
+        
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        logger.info(f"Connection accepted: active count={len(self.active_connections)}")
+        return True
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            logger.info(f"Connection disconnected: active count={len(self.active_connections)}")
+
+manager = ConnectionManager()
+
 
 def extract_amount(text: str) -> str:
     match = re.search(r'(?:Rs\.?|₹|rupees|INR)\s*[\d,]+(?:\.\d+)?', text, re.IGNORECASE)
@@ -86,16 +112,30 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
     via Groq LLM, synthesizes the reply into audio using Sarvam TTS,
     and sends the audio bytes back.
     """
-    await websocket.accept()
+    if not await manager.connect(websocket):
+        return
+
     if not call_id:
         call_id = str(uuid.uuid4())
         
-    logger.info(f"WebSocket connection established with language={language}, call_id={call_id}, user_id={user_id}")
+    caller_number = "unknown"
+    if call_id:
+        try:
+            supabase = get_supabase()
+            existing_res = supabase.table("call_logs").select("caller_number").eq("id", call_id).execute()
+            if existing_res.data:
+                caller_number = existing_res.data[0].get("caller_number", "unknown")
+        except Exception as e:
+            logger.error(f"Failed to fetch caller_number for session: {e}")
+
+    logger.info(f"WebSocket connection established with language={language}, call_id={call_id}, user_id={user_id}, caller_number={caller_number}")
     
     conversation_history = []
     turn_number = 0
     vad_detector = VoiceActivityDetector()
     turn_start_time = None
+    llm_failure_count = 0
+
     
     try:
         while True:
@@ -335,9 +375,39 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         logger.error(f"LLM General Failure on retry: {str(e)}", exc_info=True)
  
                 if llm_reply is None:
-                    # Fall back to "Let me have someone call you back" clip
-                    await _play_fallback_audio(websocket, "llm_fallback", language)
-                    continue
+                    llm_failure_count += 1
+                    logger.warning(f"LLM response generation failed. Consecutive failure count: {llm_failure_count}")
+                    
+                    if llm_failure_count >= 2:
+                        exit_msg = "I'm having trouble connecting right now. Someone will call you back in 30 minutes."
+                        logger.error(f"LLM failure limit reached (count={llm_failure_count}). Synthesizing emergency message and exiting gracefully.")
+                        try:
+                            await websocket.send_json({
+                                "status": "tts_start"
+                            })
+                            async for chunk in text_to_speech_stream(exit_msg, language):
+                                if chunk:
+                                    await websocket.send_bytes(chunk)
+                            await websocket.send_json({
+                                "status": "tts_end"
+                            })
+                        except Exception as tts_err:
+                            logger.error(f"Failed to play final emergency audio: {tts_err}")
+                        
+                        # Trigger background task to alert business owner
+                        from app.workers.tasks import send_emergency_callback_whatsapp
+                        asyncio.create_task(send_emergency_callback_whatsapp(caller_number))
+                        
+                        # Gracefully close WebSocket and break loop
+                        await websocket.close(code=1000)
+                        break
+                    else:
+                        # Fall back to "Let me have someone call you back" clip
+                        await _play_fallback_audio(websocket, "llm_fallback", language)
+                        continue
+                else:
+                    # Reset failure count on successful response
+                    llm_failure_count = 0
  
                 llm_end = time.perf_counter()
                 llm_ms = int(round((llm_end - llm_start) * 1000))
@@ -452,6 +522,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
     except Exception as e:
         logger.error(f"Unexpected error in websocket session: {str(e)}", exc_info=True)
     finally:
+        manager.disconnect(websocket)
         logger.info("WebSocket call session finished. Cleaning up.")
         
         # Check for any pending bookings made during this call session to trigger recovery
