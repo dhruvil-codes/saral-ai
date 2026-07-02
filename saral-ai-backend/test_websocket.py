@@ -266,5 +266,103 @@ class TestWebSocketCall(unittest.TestCase):
         finally:
             ws_call.MAX_HISTORY = old_max_history
 
+    @patch("app.api.ws_call.get_supabase")
+    @patch("app.api.ws_call.speech_to_text")
+    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.text_to_speech_stream")
+    @patch("app.api.ws_call.get_fallback_audio")
+    @patch("app.workers.tasks.send_emergency_callback_whatsapp")
+    def test_websocket_llm_outage_graceful_exit(self, mock_emergency_task, mock_fallback, mock_tts_stream, mock_llm, mock_stt, mock_get_supabase):
+        # Configure mocks
+        mock_stt.return_value = "Hello"
+        mock_llm.return_value = None  # Represents LLM failure
+        mock_fallback.return_value = b"fallback-audio"
+        
+        async def mock_stream(text, language_code):
+            yield b"emergency-tts-audio"
+        mock_tts_stream.side_effect = mock_stream
+        
+        # Mock Supabase
+        mock_client = MagicMock()
+        mock_table = MagicMock()
+        mock_execute = MagicMock()
+        mock_execute.data = [{"caller_number": "+919876543210"}]
+        mock_table.select.return_value.eq.return_value.execute.return_value = mock_execute
+        mock_client.table.return_value = mock_table
+        mock_get_supabase.return_value = mock_client
+        
+        client = TestClient(app)
+        
+        with client.websocket_connect("/ws/call?call_id=test-call-outage&user_id=user-uuid-123") as websocket:
+            # Turn 1: LLM fails first and second attempt -> llm_reply is None. Count becomes 1. Plays fallback.
+            websocket.send_bytes(b"audio-1")
+            self.assertEqual(websocket.receive_json(), {"status": "transcribed", "text": "Hello"})
+            self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
+            self.assertEqual(websocket.receive_bytes(), b"fallback-audio")
+            self.assertEqual(websocket.receive_json(), {"status": "tts_end"})
+            
+            # Turn 2: LLM fails again. Count becomes 2. Synthesizes emergency msg, triggers background task, closes WS.
+            websocket.send_bytes(b"audio-2")
+            self.assertEqual(websocket.receive_json(), {"status": "transcribed", "text": "Hello"})
+            self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
+            self.assertEqual(websocket.receive_bytes(), b"emergency-tts-audio")
+            self.assertEqual(websocket.receive_json(), {"status": "tts_end"})
+            
+            # Verify close
+            try:
+                msg = websocket.receive()
+                self.assertEqual(msg.get("type"), "websocket.close")
+            except Exception:
+                pass
+                
+        # Verify emergency WhatsApp task is triggered with correct caller_number
+        mock_emergency_task.assert_called_once_with("+919876543210")
+
+    @patch("app.api.ws_call.get_supabase")
+    @patch("app.api.ws_call.speech_to_text")
+    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.text_to_speech_stream")
+    def test_websocket_concurrency_limit(self, mock_tts_stream, mock_llm, mock_stt, mock_get_supabase):
+        from fastapi import WebSocketDisconnect
+        # Configure mocks
+        mock_stt.return_value = "Hello"
+        mock_llm.return_value = "Hi"
+        
+        async def mock_stream(text, language_code):
+            yield b"tts"
+        mock_tts_stream.side_effect = mock_stream
+        
+        # Mock Supabase
+        mock_client = MagicMock()
+        mock_table = MagicMock()
+        mock_execute = MagicMock()
+        mock_execute.data = [{"caller_number": "+919876543210"}]
+        mock_table.select.return_value.eq.return_value.execute.return_value = mock_execute
+        mock_client.table.return_value = mock_table
+        mock_get_supabase.return_value = mock_client
+
+        from app.core.config import settings
+        
+        # Save original settings
+        old_max_concurrent = settings.MAX_CONCURRENT_CALLS
+        settings.MAX_CONCURRENT_CALLS = 1
+        
+        client = TestClient(app)
+        
+        try:
+            # 1. Establish the first connection (active = 1)
+            with client.websocket_connect("/ws/call?call_id=call-1") as ws1:
+                # 2. Try to connect a second one (active = 2, which exceeds limit of 1)
+                # It should accept and close immediately with code 1013
+                try:
+                    with client.websocket_connect("/ws/call?call_id=call-2") as ws2:
+                        msg = ws2.receive()
+                        if msg.get("type") == "websocket.close":
+                            self.assertEqual(msg.get("code"), 1013)
+                except WebSocketDisconnect as e:
+                    self.assertEqual(e.code, 1013)
+        finally:
+            settings.MAX_CONCURRENT_CALLS = old_max_concurrent
+
 if __name__ == "__main__":
     unittest.main()
