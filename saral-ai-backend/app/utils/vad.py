@@ -154,6 +154,12 @@ class VoiceActivityDetector:
         # Find where we left off based on total processed ms.
         processed_bytes = int(self.total_processed_ms * self.bytes_per_ms)
         
+        # Self-healing: if the buffer was cleared or pruned from outside,
+        # adjust total_processed_ms to match the current buffer size.
+        if processed_bytes > len(self.audio_buffer):
+            self.total_processed_ms = len(self.audio_buffer) / self.bytes_per_ms
+            processed_bytes = len(self.audio_buffer)
+            
         # Append new chunk to the buffer
         self.audio_buffer.extend(chunk)
         
