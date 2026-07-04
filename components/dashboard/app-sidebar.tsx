@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronsUpDown,
   User2,
+  Mic,
 } from "lucide-react";
 import { SaralLogoMark } from "@/assets/logo/logo";
 
@@ -59,6 +60,11 @@ const navItems = [
         title: "Knowledge Base",
         url: "/dashboard/faqs",
         icon: BookOpen,
+      },
+      {
+        title: "Test Agent",
+        url: "/dashboard/test-agent",
+        icon: Mic,
       },
     ],
   },
