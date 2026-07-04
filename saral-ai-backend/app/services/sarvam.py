@@ -104,7 +104,25 @@ def speech_to_text(audio_bytes: bytes, language_code: str) -> str:
                 f"Sarvam STT response did not contain 'transcript' key: {result}"
             )
             
-        return result["transcript"]
+        transcript = result["transcript"]
+        
+        # Check language confidence score
+        confidence = result.get("language_probability")
+        if confidence is None:
+            # Fallback to general confidence score if any
+            confidence = result.get("confidence", 1.0)
+            
+        # Fallback Logic: If the STT provider returns a low confidence score (< 0.5) for Hindi/Hinglish,
+        # automatically fall back to an English-only parsing mode to salvage the transcript.
+        is_hindi = language_code.lower().startswith("hi")
+        if is_hindi and confidence < 0.5:
+            logger.warning(
+                f"Low confidence ({confidence}) detected for Hindi/Hinglish. "
+                f"Automatically falling back to English-only parsing mode (en-IN) to salvage transcript."
+            )
+            return speech_to_text(audio_bytes, "en-IN")
+            
+        return transcript
         
     except (httpx.TimeoutException, httpx.HTTPStatusError) as he:
         raise he
