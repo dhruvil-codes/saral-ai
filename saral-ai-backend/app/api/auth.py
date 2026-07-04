@@ -11,8 +11,11 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
+import logging
 from app.core.config import settings
 from app.db.supabase_client import get_supabase
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -175,3 +178,53 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired authentication token"
     )
+
+class SettingsUpdateRequest(BaseModel):
+    business_name: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    vad_threshold_ms: Optional[int] = None
+
+@router.put("/settings")
+async def update_settings(
+    body: SettingsUpdateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    supabase = get_supabase()
+    update_data = {}
+    if body.business_name is not None:
+        update_data["business_name"] = body.business_name
+    if body.whatsapp_number is not None:
+        update_data["whatsapp_number"] = body.whatsapp_number
+    if body.vad_threshold_ms is not None:
+        val = body.vad_threshold_ms
+        update_data["vad_threshold_ms"] = max(600, min(2000, val))
+
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No settings fields provided for update"
+        )
+
+    try:
+        response = supabase.table("users").update(update_data).eq("id", current_user["id"]).execute()
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update settings"
+            )
+        updated_user = response.data[0]
+        return {
+            "status": "success",
+            "user": {
+                "id": str(updated_user["id"]),
+                "email": updated_user["email"],
+                "business_name": updated_user.get("business_name"),
+                "whatsapp_number": updated_user.get("whatsapp_number"),
+                "vad_threshold_ms": updated_user.get("vad_threshold_ms", 1000)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database update error: {str(e)}"
+        )
