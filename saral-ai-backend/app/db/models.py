@@ -98,6 +98,7 @@ class User(BaseModel):
     password_hash: str
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    vad_threshold_ms: Optional[int] = 1000
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -107,6 +108,7 @@ class UserResponse(BaseModel):
     email: str
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    vad_threshold_ms: Optional[int] = 1000
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
