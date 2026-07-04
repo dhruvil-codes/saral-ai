@@ -132,7 +132,37 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
     
     conversation_history = []
     turn_number = 0
-    vad_detector = VoiceActivityDetector()
+    
+    vad_threshold = 1000  # Default silence threshold updated from 600ms to 1000ms
+    if user_id:
+        try:
+            supabase = get_supabase()
+            user_res = supabase.table("users").select("vad_threshold_ms").eq("id", user_id).execute()
+            if user_res.data and user_res.data[0].get("vad_threshold_ms") is not None:
+                raw_val = user_res.data[0]["vad_threshold_ms"]
+                if isinstance(raw_val, int):
+                    vad_threshold = max(600, min(2000, raw_val))
+                elif isinstance(raw_val, str):
+                    clean_val = raw_val.lower().replace("ms", "").strip()
+                    if "-" in clean_val:
+                        parts = clean_val.split("-")
+                        try:
+                            v1 = int(parts[0].strip())
+                            v2 = int(parts[1].strip())
+                            vad_threshold = int((v1 + v2) / 2)
+                        except ValueError:
+                            vad_threshold = 1000
+                    else:
+                        try:
+                            vad_threshold = int(clean_val)
+                        except ValueError:
+                            vad_threshold = 1000
+                    vad_threshold = max(600, min(2000, vad_threshold))
+                logger.info(f"Using VAD threshold: {vad_threshold}ms (fetched for user {user_id})")
+        except Exception as e:
+            logger.error(f"Failed to fetch vad_threshold_ms for user {user_id}: {e}")
+            
+    vad_detector = VoiceActivityDetector(silence_threshold_ms=vad_threshold)
     turn_start_time = None
     llm_failure_count = 0
 
@@ -187,6 +217,16 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 if is_silence_detected or max_audio_limit_reached:
                     trigger_stt = True
                     audio_to_process = bytes(vad_detector.audio_buffer)
+                    if not vad_detector.is_container_format(audio_to_process):
+                        import io
+                        import wave
+                        wav_buf = io.BytesIO()
+                        with wave.open(wav_buf, "wb") as wav_file:
+                            wav_file.setnchannels(1)
+                            wav_file.setsampwidth(2)
+                            wav_file.setframerate(16000)
+                            wav_file.writeframes(audio_to_process)
+                        audio_to_process = wav_buf.getvalue()
 
                     stt_trigger_time = time.perf_counter()
                     buffering_overhead_ms = int(round((stt_trigger_time - turn_start_time) * 1000))
@@ -331,7 +371,13 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                 faq_items.append(item_str)
                                 
                             faq_context = "\n".join(faq_items)
-                            system_prompt = f"You are a helpful receptionist AI assistant for Saral AI.\n\nUse the following relevant business FAQs to answer the user's question:\n{faq_context}"
+                            system_prompt = (
+                                 "You are a helpful receptionist AI assistant for Saral AI.\n\n"
+                                 f"Use the following relevant business FAQs to answer the user's question:\n{faq_context}\n\n"
+                                 "[LANGUAGE GUIDELINE: The user will frequently speak in \"Hinglish\" (a mix of Hindi and English). "
+                                 "You must perfectly understand this mix. Always reply in the same natural, conversational language the "
+                                 "user is speaking. Do not use overly formal Hindi; use natural, everyday Hinglish.]"
+                             )
                             logger.info(f"RAG: Injected {len(faqs)} relevant FAQs into system prompt.")
                     except Exception as rag_err:
                         logger.error(f"RAG: Error fetching FAQs: {rag_err}", exc_info=True)
