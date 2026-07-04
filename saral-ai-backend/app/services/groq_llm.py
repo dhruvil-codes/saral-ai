@@ -108,6 +108,15 @@ def get_response(
     )
     sys_content = system_prompt or default_sys
     
+    # Append Hinglish language guideline instruction
+    hinglish_instruction = (
+        "\n\n[LANGUAGE GUIDELINE: The user will frequently speak in \"Hinglish\" (a mix of Hindi and English). "
+        "You must perfectly understand this mix. Always reply in the same natural, conversational language the user is speaking. "
+        "Do not use overly formal Hindi; use natural, everyday Hinglish.]"
+    )
+    if "[LANGUAGE GUIDELINE:" not in sys_content:
+        sys_content += hinglish_instruction
+    
     booking_instructions = (
         "\n\n[CRITICAL APPOINTMENT BOOKING RULES]:\n"
         "1. If the caller wants to book or reserve an appointment, you must first call the hold_appointment_slot tool with the requested slot.\n"
