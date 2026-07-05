@@ -23,6 +23,7 @@ export default function SettingsPage() {
     businessName: "",
     whatsappNumber: "",
     vadThresholdMs: 1000,
+    notificationPreference: "urgent_only",
     systemPrompt: `You are a friendly AI receptionist for Glamour Salon & Spa. Your name is Sara.
 
 Your role is to:
@@ -61,6 +62,7 @@ Current business hours: Monday–Saturday 9 AM–8 PM, Sunday 10 AM–6 PM.`,
               businessName: user.business_name || "",
               whatsappNumber: user.whatsapp_number || "",
               vadThresholdMs: user.vad_threshold_ms || 1000,
+              notificationPreference: user.notification_preference || "urgent_only",
             }));
           }
         }
@@ -92,6 +94,7 @@ Current business hours: Monday–Saturday 9 AM–8 PM, Sunday 10 AM–6 PM.`,
           business_name: form.businessName,
           whatsapp_number: form.whatsappNumber,
           vad_threshold_ms: form.vadThresholdMs,
+          notification_preference: form.notificationPreference,
         }),
       });
 
@@ -181,6 +184,75 @@ Current business hours: Monday–Saturday 9 AM–8 PM, Sunday 10 AM–6 PM.`,
             <p className="text-xs text-muted-foreground font-sans">
               Increase this if the AI interrupts your callers too quickly.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Notification Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl font-bold">Notification Preferences</CardTitle>
+          <CardDescription className="font-sans">
+            Choose how and when you receive WhatsApp alerts for calls and bookings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 font-sans">
+          <div className="grid gap-3">
+            {[
+              {
+                value: "all",
+                label: "Immediate Alerts (All Calls)",
+                description: "Get a WhatsApp message summary immediately after every call."
+              },
+              {
+                value: "urgent_only",
+                label: "Smart Alerts (Urgent Only + 8 PM Daily Digest)",
+                description: "Only get immediate WhatsApps for failed bookings or urgent keywords. Other calls are compiled into an 8 PM daily summary.",
+                recommended: true
+              },
+              {
+                value: "digest",
+                label: "Quiet Mode (8 PM Daily Digest Only)",
+                description: "No immediate alerts. Receive a single summary message of the day's activity at 8 PM."
+              }
+            ].map((opt) => (
+              <div
+                key={opt.value}
+                onClick={() => setForm({ ...form, notificationPreference: opt.value })}
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                  form.notificationPreference === opt.value
+                    ? "border-[#f5a623] bg-[#fdfaf2] ring-1 ring-[#f5a623]"
+                    : "border-border hover:bg-secondary/50"
+                }`}
+              >
+                <div className="flex items-center justify-center mt-1">
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                    form.notificationPreference === opt.value
+                      ? "border-[#f5a623]"
+                      : "border-muted-foreground"
+                  }`}>
+                    {form.notificationPreference === opt.value && (
+                      <div className="w-2 h-2 rounded-full bg-[#f5a623]" />
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm text-foreground">{opt.label}</span>
+                    {opt.recommended && (
+                      <Badge className="bg-[#f5a623] hover:bg-[#e09510] text-black text-[10px] font-semibold px-2 py-0.5 rounded-full border-none">
+                        Recommended
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-normal">
+                    {opt.description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
