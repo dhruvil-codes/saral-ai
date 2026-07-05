@@ -126,6 +126,7 @@ class MockSupabaseClient:
         return MockTable(table_name)
 
 # Patch get_supabase and Twilio calls before importing the app
+import app.db.supabase_client
 with patch('app.db.supabase_client.get_supabase', return_value=MockSupabaseClient()):
     from app.main import app
     from app.api.bookings import hold_booking_slot, confirm_booking_slot
@@ -140,6 +141,7 @@ class TestResilienceFeatures(unittest.TestCase):
             patch('app.api.ws_call.get_supabase', return_value=MockSupabaseClient()),
             patch('app.api.bookings.get_supabase', return_value=MockSupabaseClient()),
             patch('app.api.callback.get_supabase', return_value=MockSupabaseClient()),
+            patch('app.services.intent_cache._load_model', return_value=False),
         ]
         for p in self.patchers:
             p.start()
