@@ -641,11 +641,35 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     supabase.table("call_logs").upsert(log_data).execute()
                     logger.info(f"Upserted call log {call_id} in Supabase with status completed.")
                     
-                    # Fetch business user's whatsapp_number from database to send summary
-                    user_res = supabase.table("users").select("whatsapp_number").eq("id", user_id).execute()
+                    # Fetch business user's whatsapp_number and notification_preference from database to send summary
+                    user_res = supabase.table("users").select("whatsapp_number, notification_preference").eq("id", user_id).execute()
                     if user_res.data and user_res.data[0].get("whatsapp_number"):
                         whatsapp_number = user_res.data[0]["whatsapp_number"]
-                        # Trigger WhatsApp message
-                        await send_post_call_summary(whatsapp_number, summary, user_id)
+                        preference = user_res.data[0].get("notification_preference", "urgent_only")
+                        
+                        should_send = True
+                        if preference in ["urgent_only", "digest"]:
+                            booking_failed = False
+                            for msg in conversation_history:
+                                if msg.get("role") == "tool":
+                                    try:
+                                        content_data = json.loads(msg.get("content", "{}"))
+                                        if content_data.get("status") == "error":
+                                            booking_failed = True
+                                            break
+                                    except Exception:
+                                        pass
+                            
+                            angry_keywords = ["urgent", "emergency", "manager", "owner", "complaint", "gussa", "cancel"]
+                            has_keyword = any(kw in full_transcript.lower() for kw in angry_keywords)
+                            
+                            should_send = booking_failed or has_keyword
+                            logger.info(f"[SMART ROUTER] preference={preference}, booking_failed={booking_failed}, has_keyword={has_keyword} -> should_send={should_send}")
+                        
+                        if should_send:
+                            # Trigger WhatsApp message
+                            await send_post_call_summary(whatsapp_number, summary, user_id)
+                        else:
+                            logger.info(f"[SMART ROUTER] Suppressing immediate WhatsApp notification for {whatsapp_number} due to preference '{preference}'.")
                 except Exception as db_err:
                     logger.error(f"Failed to perform post-call logging/WhatsApp summary: {db_err}")
