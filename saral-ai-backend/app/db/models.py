@@ -99,6 +99,7 @@ class User(BaseModel):
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
     vad_threshold_ms: Optional[int] = 1000
+    notification_preference: Optional[str] = "urgent_only"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -109,6 +110,7 @@ class UserResponse(BaseModel):
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
     vad_threshold_ms: Optional[int] = 1000
+    notification_preference: Optional[str] = "urgent_only"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
