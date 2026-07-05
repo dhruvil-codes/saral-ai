@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from app.api import auth, faqs, ws_call, calls, bookings, callback
 from app.api.auth import get_current_user
-from app.workers import faq_worker
+from app.workers import faq_worker, digest_worker
 import asyncio
 
 # Configure logger
@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
     from app.services.intent_cache import semantic_cache
     from fastapi.concurrency import run_in_threadpool
     from app.workers.faq_worker import faq_scheduler_loop
+    from app.workers.digest_worker import daily_digest_scheduler_loop
     
     logger.info("Lifespan startup: initializing fallback audio...")
     await run_in_threadpool(initialize_fallback_audio)
@@ -32,15 +33,19 @@ async def lifespan(app: FastAPI):
         
     logger.info("Lifespan startup: starting FAQ scheduler loop...")
     faq_task = asyncio.create_task(faq_scheduler_loop())
+
+    logger.info("Lifespan startup: starting Daily Digest scheduler loop...")
+    digest_task = asyncio.create_task(daily_digest_scheduler_loop())
     
     yield
     
-    logger.info("Lifespan shutdown: cancelling FAQ scheduler loop...")
+    logger.info("Lifespan shutdown: cancelling scheduler loops...")
     faq_task.cancel()
+    digest_task.cancel()
     try:
-        await faq_task
-    except asyncio.CancelledError:
-        pass
+        await asyncio.gather(faq_task, digest_task, return_exceptions=True)
+    except Exception as e:
+        logger.warning(f"Error during lifespan task cancellation: {e}")
 
 app = FastAPI(title="Saral AI Backend", lifespan=lifespan)
 
@@ -50,6 +55,7 @@ app.include_router(calls.router, prefix="/api")
 app.include_router(bookings.router, prefix="/api")
 app.include_router(callback.router, prefix="/api")
 app.include_router(faq_worker.router, prefix="/api")
+app.include_router(digest_worker.router, prefix="/api")
 app.include_router(ws_call.router)
 
 @app.get("/health")
