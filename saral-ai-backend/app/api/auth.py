@@ -183,6 +183,7 @@ class SettingsUpdateRequest(BaseModel):
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
     vad_threshold_ms: Optional[int] = None
+    notification_preference: Optional[str] = None
 
 @router.put("/settings")
 async def update_settings(
@@ -198,6 +199,14 @@ async def update_settings(
     if body.vad_threshold_ms is not None:
         val = body.vad_threshold_ms
         update_data["vad_threshold_ms"] = max(600, min(2000, val))
+    if body.notification_preference is not None:
+        val = body.notification_preference
+        if val not in ["all", "urgent_only", "digest"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid notification preference. Must be 'all', 'urgent_only', or 'digest'."
+            )
+        update_data["notification_preference"] = val
 
     if not update_data:
         raise HTTPException(
@@ -220,7 +229,8 @@ async def update_settings(
                 "email": updated_user["email"],
                 "business_name": updated_user.get("business_name"),
                 "whatsapp_number": updated_user.get("whatsapp_number"),
-                "vad_threshold_ms": updated_user.get("vad_threshold_ms", 1000)
+                "vad_threshold_ms": updated_user.get("vad_threshold_ms", 1000),
+                "notification_preference": updated_user.get("notification_preference", "urgent_only")
             }
         }
     except Exception as e:
