@@ -7,6 +7,7 @@ including strict tool execution for database-level slot locking.
 import os
 import json
 import logging
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 import httpx
@@ -18,18 +19,39 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+def is_valid_iso_datetime(val: Any) -> bool:
+    """
+    Validates if the provided slot value is a precise, non-vague ISO-8601 datetime string.
+    Vague descriptors (e.g. morning, afternoon, kal, subah, tomorrow) are rejected.
+    """
+    if not isinstance(val, str):
+        return False
+    vague_keywords = ["morning", "afternoon", "evening", "night", "today", "tomorrow", "kal", "subah", "shaam", "dopahar"]
+    if any(kw in val.lower() for kw in vague_keywords):
+        return False
+    try:
+        # replace Z with +00:00 for python 3.10 and below compatibility if needed
+        s = val.replace('Z', '+00:00')
+        dt = datetime.fromisoformat(s)
+        # Ensure it has a time component (contains 'T' or a space separating date and time)
+        if 'T' not in val and ' ' not in val:
+            return False
+        return True
+    except Exception:
+        return False
+
 BOOKING_TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "hold_appointment_slot",
-            "description": "Temporarily hold/reserve an appointment slot for the caller in pending status for 10 minutes.",
+            "description": "Temporarily hold/reserve an appointment slot for the caller in pending status for 10 minutes. Requires a valid, precise ISO-8601 datetime string. Do not accept vague descriptions.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "slot_datetime": {
                         "type": "string",
-                        "description": "ISO formatted date and time for the appointment slot (e.g. 2026-06-30T10:00:00Z)."
+                        "description": "ISO formatted date and time for the appointment slot (e.g. 2026-06-30T10:00:00Z). Must be a valid, precise ISO-8601 datetime string containing both a date and a time. Vague descriptions like 'morning', 'afternoon', 'evening', 'tomorrow', or 'kal subah' are strictly forbidden."
                     }
                 },
                 "required": ["slot_datetime"]
@@ -104,7 +126,8 @@ def get_response(
         "You are a helpful receptionist AI assistant for Saral AI. "
         "If the caller wants to book or reserve an appointment, you must first call the hold_appointment_slot tool to check and temporarily hold the slot. "
         "After calling hold_appointment_slot, you MUST explicitly read back the critical information (date, time, and caller phone number if known) and ask for confirmation. "
-        "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', 'correct', 'haan', or confirms) after you read back the details."
+        "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', 'correct', 'haan', or confirms) after you read back the details. "
+        "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. If a user provides a vague time, you must immediately ask them to clarify by offering specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, or 12 PM.')."
     )
     sys_content = system_prompt or default_sys
     
@@ -121,10 +144,19 @@ def get_response(
         "\n\n[CRITICAL APPOINTMENT BOOKING RULES]:\n"
         "1. If the caller wants to book or reserve an appointment, you must first call the hold_appointment_slot tool with the requested slot.\n"
         "2. After calling hold_appointment_slot, you MUST explicitly read back the critical information (date, time, and caller phone number if known) to confirm with the caller. E.g., 'Just to confirm — Tuesday 15th at 10am, phone number 9820XXXXXX — is that correct?'\n"
-        "3. Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', 'correct', 'haan', or confirms) after you read back the details."
+        "3. Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', 'correct', 'haan', or confirms) after you read back the details.\n"
+        "4. You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. If a user provides a vague time, you must immediately ask them to clarify by offering specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, or 12 PM.')."
     )
     if user_id and "[CRITICAL APPOINTMENT BOOKING RULES]" not in sys_content:
         sys_content += booking_instructions
+
+    strict_datetime_instructions = (
+        "\n\n[STRICT DATETIME RESOLUTION RULE]:\n"
+        "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, or 12 PM.')."
+    )
+    if "[STRICT DATETIME RESOLUTION RULE]" not in sys_content:
+        sys_content += strict_datetime_instructions
     
     system_index = -1
     for i, m in enumerate(messages):
@@ -175,7 +207,15 @@ def get_response(
 
                     if slot_dt and user_id:
                         if tool_name == "hold_appointment_slot":
-                            db_result = hold_booking_slot(user_id=user_id, slot_datetime=slot_dt, call_id=call_id)
+                            if not is_valid_iso_datetime(slot_dt):
+                                logger.warning(f"Validation failed for hold_appointment_slot. Vague slot_datetime: {slot_dt}")
+                                db_result = {
+                                    "success": False,
+                                    "error": "INVALID_DATETIME_FORMAT",
+                                    "message": "Validation Error: The slot_datetime must be a precise, valid ISO-8601 datetime string. Vague inputs like 'morning', 'afternoon', or 'kal subah' are not allowed. You must immediately ask the user to clarify and offer specific slots (e.g., 10 AM, 11 AM, or 12 PM)."
+                                }
+                            else:
+                                db_result = hold_booking_slot(user_id=user_id, slot_datetime=slot_dt, call_id=call_id)
                         else:
                             db_result = confirm_booking_slot(user_id=user_id, slot_datetime=slot_dt)
                     else:
