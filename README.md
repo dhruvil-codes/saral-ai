@@ -24,6 +24,7 @@ Saral AI is an intelligent, real-time voice receptionist built to help Micro, Sm
   - [Backend Setup](#backend-setup)
   - [Frontend Setup](#frontend-setup)
 - [Real-Time Voice Pipeline](#-real-time-voice-pipeline)
+- [Background Workers & Notifications](#-background-workers--notifications)
 - [Database Schema](#-database-schema)
 - [Telemetry & Latency Diagnostics](#-telemetry--latency-diagnostics)
 
@@ -75,6 +76,7 @@ saral-ai/
 │   │   ├── db/                 # Supabase client and database schemas
 │   │   ├── services/           # Integration clients (Sarvam, Groq, Fallback)
 │   │   ├── utils/              # Voice Activity Detection algorithms
+│   │   ├── workers/            # Background workers (daily digests, FAQ audit)
 │   │   └── main.py             # FastAPI entry point
 │   ├── requirements.txt        # Backend dependencies
 │   └── tests/                  # Backend testing suite
@@ -168,6 +170,15 @@ The voice call processing loop operates through the following stages:
 3. **Transcription**: Sarvam AI converts speech audio to text output.
 4. **LLM Inference**: Groq processes customer queries with conversational context history.
 5. **Synthesis & Streaming**: Response text is converted back to speech stream and delivered to the client.
+
+---
+
+## ⏰ Background Workers & Notifications
+
+Saral AI features native background tasks managed via FastAPI's lifespan scheduler to automate business notifications:
+
+- **Daily Digest Worker**: Triggers daily at **8:00 PM IST** to summarize that day's successful bookings and standard call inquiries, delivering a consolidated report to the business owner via WhatsApp.
+- **FAQ Verification Worker**: Scans the knowledge base daily for FAQ entries older than 30 days that haven't been verified. It flags them and sends a WhatsApp prompt for verification to ensure the AI receptionist works with fresh data.
 
 ---
 
