@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.utils.vad import VoiceActivityDetector
 from app.services.sarvam import speech_to_text
-from app.services.groq_llm import get_response
+from app.services.fireworks_llm import get_response
 
 class TestHinglishAndVAD(unittest.TestCase):
 
@@ -159,30 +159,38 @@ class TestHinglishAndVAD(unittest.TestCase):
             self.assertEqual(mock_client.return_value.__enter__.return_value.post.call_count, 1)
             mock_logger.warning.assert_not_called()
 
-    @patch("app.services.groq_llm.Groq")
-    def test_llm_system_prompt_guidelines(self, mock_groq):
+    @patch("app.services.fireworks_llm.httpx.Client")
+    def test_llm_system_prompt_guidelines(self, mock_httpx_client):
         """
         Verify that LLM system prompts generated via get_response incorporate
         the natural Hinglish reply instruction guidelines.
         """
-        mock_client = MagicMock()
-        mock_groq.return_value = mock_client
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content="Mocked response", tool_calls=None))]
-        )
+        # Build a fake httpx response that fireworks_llm expects
+        fake_response = MagicMock()
+        fake_response.json.return_value = {
+            "choices": [{"message": {"content": "Mocked response", "tool_calls": None}}]
+        }
+        fake_response.raise_for_status.return_value = None
 
-        with patch.dict(os.environ, {"GROQ_API_KEY": "test-valid-key"}):
-            # Run get_response with custom system prompt and check system messages sent to Groq
+        mock_client_instance = MagicMock()
+        mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+        mock_client_instance.__exit__ = MagicMock(return_value=False)
+        mock_client_instance.post.return_value = fake_response
+        mock_httpx_client.return_value = mock_client_instance
+
+        with patch.dict(os.environ, {"FIREWORKS_API_KEY": "test-valid-key"}):
+            # Run get_response with custom system prompt and check system messages sent to Fireworks
             get_response("Mera appointment coordinate karo", [], system_prompt="Test base prompt")
 
-            # Check calls to completions.create
-            create_calls = mock_client.chat.completions.create.call_args_list
-            self.assertEqual(len(create_calls), 1)
-            
-            sent_messages = create_calls[0][1]["messages"]
+            # Check calls to httpx post
+            post_calls = mock_client_instance.post.call_args_list
+            self.assertEqual(len(post_calls), 1)
+
+            sent_payload = post_calls[0][1]["json"]
+            sent_messages = sent_payload["messages"]
             system_messages = [m for m in sent_messages if m["role"] == "system"]
             self.assertTrue(len(system_messages) > 0)
-            
+
             system_content = system_messages[0]["content"]
             expected_guideline = (
                 "[LANGUAGE GUIDELINE: The user will frequently speak in \"Hinglish\" (a mix of Hindi and English). "

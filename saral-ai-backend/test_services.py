@@ -1,5 +1,4 @@
-"""
-Verification test script for Sarvam AI and Groq LLM services.
+"""Verification test script for Sarvam AI and Fireworks AI LLM services.
 Tests functionality via unit testing, mocking out API requests by default
 if credentials are placeholders, and testing real endpoints if valid keys are found.
 """
@@ -9,23 +8,22 @@ import unittest
 import base64
 from unittest.mock import patch, MagicMock
 import httpx
-from groq import GroqError
 
 # Make sure we can import the app modules
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.services.sarvam import speech_to_text, text_to_speech, text_to_speech_stream, _normalize_language_code
-from app.services.groq_llm import get_response
+from app.services.fireworks_llm import get_response
 
 class TestServices(unittest.TestCase):
 
     def setUp(self):
         self.sarvam_key = os.getenv("SARVAM_API_KEY", "placeholder-sarvam-key")
-        self.groq_key = os.getenv("GROQ_API_KEY", "placeholder-groq-key")
-        
+        self.fireworks_key = os.getenv("FIREWORKS_API_KEY", "placeholder-fireworks-key")
+
         self.is_real_sarvam = self.sarvam_key and not self.sarvam_key.startswith("placeholder")
-        self.is_real_groq = self.groq_key and not self.groq_key.startswith("placeholder")
+        self.is_real_fireworks = self.fireworks_key and not self.fireworks_key.startswith("placeholder")
 
     def test_normalize_language_code(self):
         """Test language code normalization maps correctly."""
@@ -141,32 +139,33 @@ class TestServices(unittest.TestCase):
             self.assertEqual(stream_args[1]["json"]["speech_sample_rate"], 16000)
             self.assertEqual(stream_args[1]["json"]["output_audio_codec"], "mp3")
 
-    @patch("app.services.groq_llm.Groq")
-    def test_groq_llm_mocked(self, mock_groq):
-        """Test Groq LLM integration and message formatting under mock."""
-        mock_client_inst = MagicMock()
-        mock_completion = MagicMock()
-        mock_choice = MagicMock()
-        mock_message = MagicMock()
-        
-        mock_message.content = "This is a mock reply from receptionist."
-        mock_choice.message = mock_message
-        mock_completion.choices = [mock_choice]
-        mock_client_inst.chat.completions.create.return_value = mock_completion
-        mock_groq.return_value = mock_client_inst
+    @patch("app.services.fireworks_llm.httpx.Client")
+    def test_fireworks_llm_mocked(self, mock_httpx_client):
+        """Test Fireworks LLM integration and message formatting under mock."""
+        fake_response = MagicMock()
+        fake_response.json.return_value = {
+            "choices": [{"message": {"content": "This is a mock reply from receptionist.", "tool_calls": None}}]
+        }
+        fake_response.raise_for_status.return_value = None
 
-        with patch.dict(os.environ, {"GROQ_API_KEY": "test-groq-key"}):
+        mock_client_instance = MagicMock()
+        mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+        mock_client_instance.__exit__ = MagicMock(return_value=False)
+        mock_client_instance.post.return_value = fake_response
+        mock_httpx_client.return_value = mock_client_instance
+
+        with patch.dict(os.environ, {"FIREWORKS_API_KEY": "test-fireworks-key"}):
             history = [
                 {"role": "user", "content": "Hello"},
                 {"role": "assistant", "content": "Hello! How can I help you?"}
             ]
             response = get_response("Can I book an appointment?", history)
             self.assertEqual(response, "This is a mock reply from receptionist.")
-            
+
             # Verify system prompt prepending and user message addition
-            create_args = mock_client_inst.chat.completions.create.call_args
-            messages_sent = create_args[1]["messages"]
-            
+            post_call = mock_client_instance.post.call_args
+            messages_sent = post_call[1]["json"]["messages"]
+
             self.assertEqual(messages_sent[0]["role"], "system")
             self.assertEqual(messages_sent[1]["role"], "user")
             self.assertEqual(messages_sent[1]["content"], "Hello")
@@ -198,12 +197,12 @@ class TestServices(unittest.TestCase):
         except Exception as e:
             self.fail(f"Real Sarvam API integration failed: {e}")
 
-    def test_real_groq_llm(self):
-        """Performs integration test with real Groq endpoints if credentials are present."""
-        if not self.is_real_groq:
-            self.skipTest("Skipping real Groq test: No valid GROQ_API_KEY found.")
+    def test_real_fireworks_llm(self):
+        """Performs integration test with real Fireworks AI endpoints if credentials are present."""
+        if not self.is_real_fireworks:
+            self.skipTest("Skipping real Fireworks AI test: No valid FIREWORKS_API_KEY found.")
 
-        print("\n--- Testing Real Groq LLM ---")
+        print("\n--- Testing Real Fireworks AI LLM ---")
         try:
             history = [{"role": "system", "content": "You are a brief receptionist assistant."}]
             response = get_response("Hi, I want to talk to sales.", history)
@@ -212,7 +211,7 @@ class TestServices(unittest.TestCase):
             safe_response = response.encode('ascii', 'backslashreplace').decode('ascii')
             print(f"Success! Assistant response: '{safe_response}'")
         except Exception as e:
-            self.fail(f"Real Groq LLM integration failed: {e}")
+            self.fail(f"Real Fireworks AI LLM integration failed: {e}")
 
 if __name__ == "__main__":
     unittest.main()

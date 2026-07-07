@@ -13,14 +13,14 @@ with patch.dict("os.environ", {
     "SUPABASE_KEY": "fake-key",
     "REDIS_URL": "redis://localhost:6379/0",
     "SARVAM_API_KEY": "fake",
-    "GROQ_API_KEY": "fake",
+    "FIREWORKS_API_KEY": "fake",
     "TWILIO_ACCOUNT_SID": "fake",
     "TWILIO_AUTH_TOKEN": "fake",
     "TWILIO_PHONE_NUMBER": "fake",
     "TWILIO_WHATSAPP_FROM": "fake",
     "SECRET_KEY": "fake"
 }):
-    from app.services.groq_llm import is_valid_iso_datetime
+    from app.services.fireworks_llm import is_valid_iso_datetime
     from app.workers.digest_worker import get_seconds_until_8pm_ist
 
 class TestSafeguardsAndNotifications(unittest.TestCase):

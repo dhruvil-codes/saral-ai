@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from app.services.sarvam import speech_to_text, text_to_speech, text_to_speech_stream
-from app.services.groq_llm import get_response
+from app.services.fireworks_llm import get_response
 from app.services.fallback_audio import get_fallback_audio
 from app.utils.vad import VoiceActivityDetector
 from app.services.intent_cache import semantic_cache
@@ -383,7 +383,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         logger.error(f"RAG: Error fetching FAQs: {rag_err}", exc_info=True)
 
                 # 5. Get LLM response
-                logger.info("Getting response from Groq LLM...")
+                logger.info("Getting response from Fireworks AI LLM...")
                 llm_start = time.perf_counter()
                 
                 llm_reply = None
@@ -615,7 +615,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     if existing_res.data:
                         caller_number = existing_res.data[0].get("caller_number", "unknown")
                     
-                    # Generate summary of the call via Groq LLM
+                    # Generate summary of the call via Fireworks AI LLM
                     summary = "Call completed."
                     if full_transcript.strip():
                         try:
