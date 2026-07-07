@@ -1,0 +1,444 @@
+"""
+Fireworks AI LLM Service.
+Drop-in replacement for groq_llm.py -- identical public interface (get_response, is_valid_iso_datetime).
+Calls the Fireworks AI OpenAI-compatible REST endpoint via httpx (already in requirements.txt).
+
+Model note:
+  Default: accounts/fireworks/models/llama-v3p1-70b-instruct
+  Lower-latency alternative flagged below -- see FIREWORKS_MODEL env var docs.
+"""
+
+import os
+import json
+import logging
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+import httpx
+from app.api.bookings import hold_booking_slot, confirm_booking_slot
+
+# Load environment variables from .env if present
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Model selection note
+# ---------------------------------------------------------------------------
+# accounts/fireworks/models/llama-v3p1-70b-instruct  -> default, strong quality
+# accounts/fireworks/models/llama-v3p1-8b-instruct   -> ~40 % lower TTFT,
+#   good for pure conversational turns with no tool calls (lower quality).
+# Set FIREWORKS_MODEL in your .env to override at runtime.
+# ---------------------------------------------------------------------------
+
+FIREWORKS_API_BASE = "https://api.fireworks.ai/inference/v1"
+DEFAULT_MODEL = "accounts/fireworks/models/llama-v3p1-70b-instruct"
+
+# Timeouts: 4 s connect + 10 s read (ws_call.py applies its own asyncio.wait_for)
+_HTTP_TIMEOUT = httpx.Timeout(connect=4.0, read=10.0, write=5.0, pool=2.0)
+
+
+def is_valid_iso_datetime(val: Any) -> bool:
+    """
+    Validates if the provided slot value is a precise, non-vague ISO-8601 datetime string.
+    Vague descriptors (e.g. morning, afternoon, kal, subah, tomorrow) are rejected.
+    Identical implementation to groq_llm.is_valid_iso_datetime.
+    """
+    if not isinstance(val, str):
+        return False
+    vague_keywords = [
+        "morning", "afternoon", "evening", "night",
+        "today", "tomorrow", "kal", "subah", "shaam", "dopahar"
+    ]
+    if any(kw in val.lower() for kw in vague_keywords):
+        return False
+    try:
+        s = val.replace("Z", "+00:00")
+        datetime.fromisoformat(s)
+        if "T" not in val and " " not in val:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+BOOKING_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "hold_appointment_slot",
+            "description": (
+                "Temporarily hold/reserve an appointment slot for the caller in pending status "
+                "for 10 minutes. Requires a valid, precise ISO-8601 datetime string. "
+                "Do not accept vague descriptions."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "slot_datetime": {
+                        "type": "string",
+                        "description": (
+                            "ISO formatted date and time for the appointment slot "
+                            "(e.g. 2026-06-30T10:00:00Z). Must be a valid, precise ISO-8601 "
+                            "datetime string containing both a date and a time. Vague descriptions "
+                            "like 'morning', 'afternoon', 'evening', 'tomorrow', or 'kal subah' "
+                            "are strictly forbidden."
+                        ),
+                    }
+                },
+                "required": ["slot_datetime"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "confirm_appointment",
+            "description": "Confirm a previously held/pending appointment slot.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "slot_datetime": {
+                        "type": "string",
+                        "description": "ISO formatted date and time for the appointment slot to confirm.",
+                    }
+                },
+                "required": ["slot_datetime"],
+            },
+        },
+    },
+]
+
+
+def _fireworks_chat(
+    messages: List[Dict[str, Any]],
+    model: str,
+    api_key: str,
+    tools: Optional[List[Dict]] = None,
+    tool_choice: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Low-level synchronous POST to Fireworks /chat/completions.
+    Returns the full parsed JSON response dict.
+    Raises httpx.TimeoutException, httpx.HTTPStatusError, or RuntimeError on failure.
+    """
+    payload: Dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+    }
+    if tools:
+        payload["tools"] = tools
+    if tool_choice:
+        payload["tool_choice"] = tool_choice
+
+    logger.debug(
+        "[fireworks_llm] POST %s/chat/completions model=%s messages=%d",
+        FIREWORKS_API_BASE,
+        model,
+        len(messages),
+    )
+
+    try:
+        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+            response = client.post(
+                f"{FIREWORKS_API_BASE}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json=payload,
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.TimeoutException:
+        # Re-raise as-is so ws_call.py can catch it by type
+        raise
+    except httpx.HTTPStatusError as hse:
+        logger.error(
+            "[fireworks_llm] HTTP %s from Fireworks API during live call: %s",
+            hse.response.status_code,
+            hse.response.text[:500],
+        )
+        raise
+    except Exception as exc:
+        logger.error(
+            "[fireworks_llm] Unexpected error calling Fireworks API: %s",
+            exc,
+            exc_info=True,
+        )
+        raise RuntimeError(f"Unexpected error calling Fireworks AI: {exc}") from exc
+
+
+def get_response(
+    user_message: str,
+    conversation_history: List[Dict[str, Any]],
+    system_prompt: str = None,
+    user_id: Optional[str] = None,
+    call_id: Optional[str] = None,
+) -> str:
+    """
+    Sends the full conversation history plus the new user message to Fireworks AI
+    and returns the assistant reply.
+    Supports tool calling for appointment booking with database-level slot locking.
+
+    Identical public signature to groq_llm.get_response -- drop-in replacement.
+
+    Args:
+        user_message (str): The latest message from the user.
+        conversation_history (list): A list of dicts representing the conversation history.
+        system_prompt (str): Optional system prompt overrides/extensions.
+        user_id (str): Optional UUID string of the business user for database booking.
+        call_id (str): Optional UUID string of the call log session.
+
+    Returns:
+        str: The response text from the assistant.
+
+    Raises:
+        ValueError: If FIREWORKS_API_KEY is missing or a placeholder.
+        httpx.TimeoutException: Propagated so ws_call.py can catch and log it.
+        httpx.HTTPStatusError: Propagated so ws_call.py can catch and log it.
+        RuntimeError: For any other Fireworks API or parsing failure.
+    """
+    api_key = os.getenv("FIREWORKS_API_KEY")
+    if not api_key or api_key == "placeholder-fireworks-key":
+        raise ValueError(
+            "FIREWORKS_API_KEY environment variable is not set or contains a placeholder value."
+        )
+
+    model = os.getenv("FIREWORKS_MODEL", DEFAULT_MODEL)
+
+    # ------------------------------------------------------------------
+    # Build message list from conversation history
+    # ------------------------------------------------------------------
+    messages: List[Dict[str, Any]] = []
+    for msg in conversation_history:
+        if isinstance(msg, dict) and "role" in msg and "content" in msg:
+            role = str(msg["role"]).strip().lower()
+            if role not in ["system", "user", "assistant", "tool"]:
+                role = "user"
+            messages.append({"role": role, "content": str(msg["content"])})
+
+    # ------------------------------------------------------------------
+    # Build / inject system prompt (identical logic to groq_llm.py)
+    # ------------------------------------------------------------------
+    default_sys = (
+        "You are a helpful receptionist AI assistant for Saral AI. "
+        "If the caller wants to book or reserve an appointment, you must first call the "
+        "hold_appointment_slot tool to check and temporarily hold the slot. "
+        "After calling hold_appointment_slot, you MUST explicitly read back the critical "
+        "information (date, time, and caller phone number if known) and ask for confirmation. "
+        "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', "
+        "'correct', 'haan', or confirms) after you read back the details. "
+        "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering "
+        "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
+        "or 12 PM.')."
+    )
+    sys_content = system_prompt or default_sys
+
+    hinglish_instruction = (
+        "\n\n[LANGUAGE GUIDELINE: The user will frequently speak in \"Hinglish\" "
+        "(a mix of Hindi and English). "
+        "You must perfectly understand this mix. Always reply in the same natural, conversational "
+        "language the user is speaking. "
+        "Do not use overly formal Hindi; use natural, everyday Hinglish.]"
+    )
+    if "[LANGUAGE GUIDELINE:" not in sys_content:
+        sys_content += hinglish_instruction
+
+    booking_instructions = (
+        "\n\n[CRITICAL APPOINTMENT BOOKING RULES]:\n"
+        "1. If the caller wants to book or reserve an appointment, you must first call the "
+        "hold_appointment_slot tool with the requested slot.\n"
+        "2. After calling hold_appointment_slot, you MUST explicitly read back the critical "
+        "information (date, time, and caller phone number if known) to confirm with the caller. "
+        "E.g., 'Just to confirm - Tuesday 15th at 10am, phone number 9820XXXXXX - is that correct?'\n"
+        "3. Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', "
+        "'correct', 'haan', or confirms) after you read back the details.\n"
+        "4. You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering "
+        "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
+        "or 12 PM.')."
+    )
+    if user_id and "[CRITICAL APPOINTMENT BOOKING RULES]" not in sys_content:
+        sys_content += booking_instructions
+
+    strict_datetime_instructions = (
+        "\n\n[STRICT DATETIME RESOLUTION RULE]:\n"
+        "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering "
+        "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
+        "or 12 PM.')."
+    )
+    if "[STRICT DATETIME RESOLUTION RULE]" not in sys_content:
+        sys_content += strict_datetime_instructions
+
+    # Insert / replace system message
+    system_index = -1
+    for i, m in enumerate(messages):
+        if m["role"] == "system":
+            system_index = i
+            break
+
+    if system_index != -1:
+        messages[system_index]["content"] = sys_content
+    else:
+        messages.insert(0, {"role": "system", "content": sys_content})
+
+    messages.append({"role": "user", "content": user_message})
+
+    # ------------------------------------------------------------------
+    # First API call (with tools if user_id is present)
+    # ------------------------------------------------------------------
+    try:
+        kwargs: Dict[str, Any] = {}
+        if user_id:
+            kwargs["tools"] = BOOKING_TOOLS
+            kwargs["tool_choice"] = "auto"
+
+        data = _fireworks_chat(messages=messages, model=model, api_key=api_key, **kwargs)
+
+        choices = data.get("choices") or []
+        if not choices:
+            raise RuntimeError(
+                "[fireworks_llm] Received an empty 'choices' list from Fireworks AI -- "
+                "this is unexpected during a live call."
+            )
+
+        choice_msg = choices[0].get("message", {})
+        tool_calls = choice_msg.get("tool_calls") or []
+
+        # ------------------------------------------------------------------
+        # Tool-call handling (mirrors groq_llm.py exactly)
+        # ------------------------------------------------------------------
+        if tool_calls:
+            for tool_call in tool_calls:
+                tool_name = tool_call["function"]["name"]
+                if tool_name not in ["hold_appointment_slot", "confirm_appointment"]:
+                    continue
+
+                try:
+                    args = json.loads(tool_call["function"]["arguments"])
+                    slot_dt = args.get("slot_datetime")
+                except Exception:
+                    slot_dt = None
+
+                logger.info(
+                    "[fireworks_llm] LLM requested booking tool call '%s' for slot: %s",
+                    tool_name,
+                    slot_dt,
+                )
+
+                if slot_dt and user_id:
+                    if tool_name == "hold_appointment_slot":
+                        if not is_valid_iso_datetime(slot_dt):
+                            logger.warning(
+                                "[fireworks_llm] Validation failed for hold_appointment_slot. "
+                                "Vague slot_datetime: %s",
+                                slot_dt,
+                            )
+                            db_result = {
+                                "success": False,
+                                "error": "INVALID_DATETIME_FORMAT",
+                                "message": (
+                                    "Validation Error: The slot_datetime must be a precise, "
+                                    "valid ISO-8601 datetime string. Vague inputs like 'morning', "
+                                    "'afternoon', or 'kal subah' are not allowed. You must "
+                                    "immediately ask the user to clarify and offer specific slots "
+                                    "(e.g., 10 AM, 11 AM, or 12 PM)."
+                                ),
+                            }
+                        else:
+                            db_result = hold_booking_slot(
+                                user_id=user_id, slot_datetime=slot_dt, call_id=call_id
+                            )
+                    else:
+                        db_result = confirm_booking_slot(
+                            user_id=user_id, slot_datetime=slot_dt
+                        )
+                else:
+                    db_result = {
+                        "success": False,
+                        "error": "INVALID_SLOT",
+                        "message": "Missing slot datetime or user ID",
+                    }
+
+                # Append assistant tool-call turn to history
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": choice_msg.get("content") or "",
+                        "tool_calls": [
+                            {
+                                "id": tool_call["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call["function"]["name"],
+                                    "arguments": tool_call["function"]["arguments"],
+                                },
+                            }
+                        ],
+                    }
+                )
+
+                # Build tool result message
+                if db_result["success"]:
+                    if tool_name == "hold_appointment_slot":
+                        tool_output = json.dumps({
+                            "status": "success",
+                            "message": f"Appointment slot {slot_dt} is now held as pending for 10 minutes.",
+                        })
+                    else:
+                        tool_output = json.dumps({
+                            "status": "success",
+                            "message": f"Appointment slot {slot_dt} has been successfully confirmed.",
+                        })
+                elif db_result.get("error") == "SLOT_TAKEN":
+                    tool_output = json.dumps({
+                        "status": "error",
+                        "reason": "SLOT_TAKEN",
+                        "message": "The requested slot is already taken or held by another booking.",
+                    })
+                elif db_result.get("error") == "NO_PENDING_SLOT":
+                    tool_output = json.dumps({
+                        "status": "error",
+                        "reason": "NO_PENDING_SLOT",
+                        "message": "No pending reservation was found for this time slot. It may have expired.",
+                    })
+                else:
+                    tool_output = json.dumps({
+                        "status": "error",
+                        "reason": db_result.get("error"),
+                        "message": db_result.get("message"),
+                    })
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call["id"],
+                    "content": tool_output,
+                })
+
+                # Follow-up call after tool execution
+                followup_data = _fireworks_chat(messages=messages, model=model, api_key=api_key)
+                followup_choices = followup_data.get("choices") or []
+                if followup_choices and followup_choices[0].get("message"):
+                    return followup_choices[0]["message"].get("content") or ""
+
+        return choice_msg.get("content") or ""
+
+    except (httpx.TimeoutException, httpx.HTTPStatusError):
+        # Let these bubble up with their original type -- ws_call.py catches both
+        raise
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        logger.error(
+            "[fireworks_llm] Unexpected error during Fireworks AI completion (live call): %s",
+            exc,
+            exc_info=True,
+        )
+        raise RuntimeError(
+            f"An unexpected error occurred while calling Fireworks AI: {exc}"
+        ) from exc
+
