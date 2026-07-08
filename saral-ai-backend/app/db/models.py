@@ -46,11 +46,17 @@ CREATE TABLE IF NOT EXISTS leads (
     call_log_id UUID REFERENCES call_logs(id) ON DELETE SET NULL,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     caller_number TEXT NOT NULL,
-    name TEXT,
-    interest TEXT,
-    urgency TEXT, -- e.g., 'high', 'medium', 'low'
-    budget TEXT,
-    status TEXT NOT NULL, -- e.g., 'new', 'contacted', 'converted', 'lost'
+    name TEXT,                          -- caller_name from Stage 2 triage
+    interest TEXT,                      -- complaint from Stage 2 triage
+    urgency TEXT,                       -- urgency_level shorthand (legacy mapping)
+    budget TEXT,                        -- DEPRECATED: was used as JSON blob hack; now unused
+    -- Stage 2 triage dedicated columns (added via migration 05)
+    urgency_level TEXT,                 -- e.g., 'urgent', 'same_day', 'routine', 'faq_only'
+    patient_type TEXT,                  -- e.g., 'new', 'existing'
+    requested_slot TEXT,                -- ISO datetime string or human text like 'tomorrow 10 AM'
+    recommended_action TEXT,            -- e.g., 'callback_now', 'book_appointment', 'send_info', 'no_action'
+    language TEXT,                      -- e.g., 'Hindi', 'English', 'Marathi', 'mixed'
+    status TEXT NOT NULL,               -- e.g., 'new', 'contacted', 'converted', 'lost'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -147,7 +153,13 @@ class Lead(BaseModel):
     name: Optional[str] = None
     interest: Optional[str] = None
     urgency: Optional[str] = None
-    budget: Optional[str] = None
+    budget: Optional[str] = None  # deprecated: was used as JSON blob hack
+    # Stage 2 triage dedicated columns
+    urgency_level: Optional[str] = None
+    patient_type: Optional[str] = None
+    requested_slot: Optional[str] = None
+    recommended_action: Optional[str] = None
+    language: Optional[str] = None
     status: str
     created_at: datetime
 

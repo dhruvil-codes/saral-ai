@@ -28,6 +28,24 @@ from datetime import timedelta
 # Configure logger
 logger = logging.getLogger(__name__)
 
+# Module-level set to hold strong references to in-flight background tasks.
+# asyncio.create_task() without storing a reference can cause silent garbage
+# collection before the task completes (especially during object teardown like
+# a WebSocket closing). Tasks remove themselves via a done-callback.
+BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _schedule_background_task(coro) -> asyncio.Task:
+    """Creates an asyncio task, holds a reference to prevent GC, and auto-removes
+    the reference via a done-callback when the task completes or is cancelled."""
+    # DIAG-1: confirm BACKGROUND_TASKS is the same module-level object each call
+    print(f"[DIAG-1] _schedule_background_task called. id(BACKGROUND_TASKS)={id(BACKGROUND_TASKS)} len_before={len(BACKGROUND_TASKS)}", flush=True)
+    task = asyncio.create_task(coro)
+    BACKGROUND_TASKS.add(task)
+    task.add_done_callback(BACKGROUND_TASKS.discard)
+    print(f"[DIAG-1] Task created and stored. id(BACKGROUND_TASKS)={id(BACKGROUND_TASKS)} len_after={len(BACKGROUND_TASKS)}", flush=True)
+    return task
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: set[WebSocket] = set()
@@ -102,6 +120,69 @@ async def _play_fallback_audio(websocket: WebSocket, phrase_id: str, language: s
             logger.warning(f"No fallback audio bytes found for '{phrase_id}' in language '{language}'")
     except Exception as e:
         logger.error(f"Failed to play fallback audio: {str(e)}", exc_info=True)
+
+
+async def run_stage2_triage_background(call_id: str, user_id: str, caller_number: str, transcript: str):
+    """
+    Runs Stage 2 triage post-call extraction on a threadpool,
+    then saves the structured results into the database.
+
+    Writes directly to dedicated triage columns (urgency_level, patient_type,
+    requested_slot, recommended_action, language) instead of JSON-stringifying
+    everything into the deprecated 'budget' column.
+    """
+    # DIAG-2: guaranteed-flush print BEFORE any async/IO — tells us if we were even entered
+    print(f"[DIAG-2] run_stage2_triage_background ENTERED. call_id={call_id} transcript_len={len(transcript)}", flush=True)
+    logger.info(f"Starting Stage 2 triage background task for call_id={call_id}")
+    try:
+        from app.services.stage2_triage import extract_case_summary
+        
+        # Run minimax-m3 inference in a threadpool to prevent blocking the event loop
+        triage_data = await run_in_threadpool(extract_case_summary, transcript)
+        
+        is_fallback = triage_data.get("complaint") == "Could not extract complaint details"
+        if is_fallback:
+            logger.warning(f"Stage 2 triage for call_id={call_id} completed using safe fallbacks.")
+        else:
+            logger.info(f"Stage 2 triage for call_id={call_id} completed successfully: {triage_data}")
+            
+        # Store in Supabase leads table using dedicated schema columns
+        supabase = get_supabase()
+        lead_data = {
+            "call_log_id": call_id,
+            "user_id": user_id,
+            "caller_number": caller_number,
+            # Mapped fields (unchanged from before)
+            "name": triage_data.get("caller_name") or "Unknown Patient",
+            "interest": triage_data.get("complaint") or "No complaint captured",
+            "urgency": triage_data.get("urgency_level") or "routine",
+            # Dedicated triage columns (replaces the budget JSON blob hack)
+            "urgency_level": triage_data.get("urgency_level"),
+            "patient_type": triage_data.get("patient_type"),
+            "requested_slot": triage_data.get("requested_slot"),
+            "recommended_action": triage_data.get("recommended_action"),
+            "language": triage_data.get("language"),
+            "status": "new",
+            # NOTE: 'budget' column intentionally omitted — was a JSON blob hack
+        }
+        
+        supabase.table("leads").insert(lead_data).execute()
+        logger.info(f"Successfully stored Stage 2 triage result in 'leads' table for call_id={call_id}.")
+
+    except asyncio.CancelledError:
+        # Log explicit cancellation so it's visible in logs (not silently dropped)
+        logger.warning(
+            f"Stage 2 triage background task for call_id={call_id} was cancelled "
+            "(e.g., event loop shutdown during server restart). "
+            "DB write may be incomplete."
+        )
+        raise  # Re-raise so asyncio can clean up properly
+    except Exception as e:
+        logger.error(
+            f"Stage 2 triage background task for call_id={call_id} failed with unhandled exception: {e}",
+            exc_info=True
+        )
+
 
 @router.websocket("/ws/call")
 async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id: str = None, user_id: str = None):
@@ -204,9 +285,11 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 is_silence_detected = vad_detector.process_chunk(audio_bytes)
 
                 if not vad_detector.speech_detected:
-                    # Still in pre-speech region: drop this chunk locally to avoid STT costs.
-                    # Reset buffers, keep VAD state machine advancing.
-                    vad_detector.audio_buffer = bytearray()
+                    # Still in pre-speech region: the rolling pre-speech buffer inside
+                    # vad_detector already retains the last ~500 ms of audio so that
+                    # when speech onset IS detected those frames can be prepended to the
+                    # utterance. Do NOT wipe audio_buffer here — the VAD owns it.
+                    pass
                 else:
                     # Speech is active; keep buffering until end-of-utterance.
                     # (End-of-utterance is signaled by is_silence_detected.)
@@ -520,7 +603,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                             logger.error(f"Failed to play final emergency audio: {tts_err}")
                         
                         from app.workers.tasks import send_emergency_callback_whatsapp
-                        asyncio.create_task(send_emergency_callback_whatsapp(caller_number))
+                        _schedule_background_task(send_emergency_callback_whatsapp(caller_number))
                         
                         await websocket.close(code=1000)
                         break
@@ -582,12 +665,15 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 
             except Exception as e:
                 # Log exception per step without crashing the WebSocket
+                # DIAG-3: show exception type and conversation_history length at time of inner except
+                print(f"[DIAG-3] Inner except caught: type={type(e).__name__} msg={e!r} conversation_history_len={len(conversation_history)}", flush=True)
                 logger.error(f"Error processing voice call step: {str(e)}", exc_info=True)
                 try:
                     await websocket.send_json({
                         "error": str(e)
                     })
                 except Exception as send_err:
+                    print(f"[DIAG-3] send_json(error) also failed: {type(send_err).__name__} -- breaking loop. conversation_history_len={len(conversation_history)}", flush=True)
                     logger.error(f"Failed to send error message to client: {str(send_err)}")
                     # If sending failed, connection might be broken, so break loop
                     break
@@ -597,6 +683,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
         logger.error(f"Unexpected error in websocket session: {str(e)}", exc_info=True)
     finally:
         manager.disconnect(websocket)
+        # DIAG-4: show conversation_history state at the moment finally runs
+        print(f"[DIAG-4] finally block reached. call_id={call_id} user_id={user_id} conversation_history_len={len(conversation_history)}", flush=True)
         logger.info("WebSocket call session finished. Cleaning up.")
         
         # Check for any pending bookings made during this call session to trigger recovery
@@ -619,11 +707,13 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     if caller_number and caller_number != "unknown":
                         from app.workers.tasks import send_dropped_call_recovery_whatsapp
                         logger.info(f"Triggering background task send_dropped_call_recovery_whatsapp for {caller_number}")
-                        asyncio.create_task(send_dropped_call_recovery_whatsapp(caller_number))
+                        _schedule_background_task(send_dropped_call_recovery_whatsapp(caller_number))
             except Exception as recovery_err:
                 logger.error(f"Failed to check pending bookings or trigger recovery task: {recovery_err}", exc_info=True)
 
         # Perform post-call updates
+        # DIAG-4b: this is the GATE — if conversation_history is empty, triage is NEVER scheduled
+        print(f"[DIAG-4b] conversation_history gate check: len={len(conversation_history)} -> will_enter={bool(conversation_history)}", flush=True)
         if conversation_history:
             # 1. Compile the full transcript
             full_transcript = "\n".join([
@@ -701,3 +791,29 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                             logger.info(f"[SMART ROUTER] Suppressing immediate WhatsApp notification for {whatsapp_number} due to preference '{preference}'.")
                 except Exception as db_err:
                     logger.error(f"Failed to perform post-call logging/WhatsApp summary: {db_err}")
+
+        # Post-call Stage 2 triage (decoupled from in-memory conversation_history, Option B)
+        if call_id and user_id:
+            try:
+                supabase = get_supabase()
+                # Fetch the latest transcript and caller number from the DB (authoritative source of truth)
+                db_res = supabase.table("call_logs").select("transcript, caller_number").eq("id", call_id).execute()
+                if db_res.data:
+                    db_transcript = db_res.data[0].get("transcript") or ""
+                    db_caller_number = db_res.data[0].get("caller_number") or "unknown"
+                    
+                    # DIAG-5: confirm we actually reach the scheduling call
+                    print(f"[DIAG-5] About to schedule Stage 2 triage. call_id={call_id} db_transcript_len={len(db_transcript)}", flush=True)
+                    _schedule_background_task(
+                        run_stage2_triage_background(
+                            call_id=call_id,
+                            user_id=user_id,
+                            caller_number=db_caller_number,
+                            transcript=db_transcript
+                        )
+                    )
+                    print(f"[DIAG-5] Stage 2 triage task scheduled.", flush=True)
+                else:
+                    logger.warning(f"No call log found for call_id={call_id} in DB. Stage 2 triage skipped.")
+            except Exception as triage_sched_err:
+                logger.error(f"Failed to schedule Stage 2 triage from DB transcript: {triage_sched_err}")

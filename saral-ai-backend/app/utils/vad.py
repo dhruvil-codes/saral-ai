@@ -8,6 +8,7 @@ import os
 import math
 import struct
 import logging
+import collections
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,9 @@ class VoiceActivityDetector:
         channels: int = None,
         rms_threshold: float = None,
         silence_threshold_ms: int = None,
-        webrtcvad_mode: int = 2
+        webrtcvad_mode: int = 2,
+        pre_speech_duration_ms: int = None,
+        force_rms: bool = False
     ):
         """
         Initializes the Voice Activity Detector.
@@ -51,16 +54,35 @@ class VoiceActivityDetector:
             rms_threshold: RMS amplitude threshold for speech detection (default from settings).
             silence_threshold_ms: Silence duration in ms to trigger end of speech (default from settings).
             webrtcvad_mode: Aggressiveness mode for webrtcvad (0 to 3, default 2).
+            pre_speech_duration_ms: How many ms of audio to keep in the rolling pre-speech
+                buffer. When speech is first detected this buffer is prepended to the
+                utterance buffer so that soft opening syllables are not lost.
+                Defaults to settings.VAD_PRE_SPEECH_DURATION_MS (500 ms).
+            force_rms: If True, skip Silero and webrtcvad and always use the RMS
+                threshold. Useful in unit tests that generate artificial PCM frames
+                which webrtcvad would reject as invalid.
         """
         self.sample_rate = sample_rate if sample_rate is not None else settings.VAD_SAMPLE_RATE
         self.sample_width = sample_width if sample_width is not None else settings.VAD_SAMPLE_WIDTH
         self.channels = channels if channels is not None else settings.VAD_CHANNELS
         self.rms_threshold = rms_threshold if rms_threshold is not None else settings.VAD_RMS_THRESHOLD
         self.silence_threshold_ms = silence_threshold_ms if silence_threshold_ms is not None else settings.SILENCE_THRESHOLD_MS
+        self.force_rms = force_rms
+
+        # How many ms of pre-speech audio to retain in the rolling buffer.
+        # Tunable via VAD_PRE_SPEECH_DURATION_MS env var (default 500 ms).
+        self.pre_speech_duration_ms = (
+            pre_speech_duration_ms
+            if pre_speech_duration_ms is not None
+            else getattr(settings, "VAD_PRE_SPEECH_DURATION_MS", 500)
+        )
         
         # Calculate bytes per millisecond
         self.bytes_per_sample = self.sample_width * self.channels
         self.bytes_per_ms = (self.sample_rate * self.bytes_per_sample) / 1000.0
+
+        # Maximum bytes to store in the rolling pre-speech buffer
+        self._pre_speech_max_bytes = int(self.pre_speech_duration_ms * self.bytes_per_ms)
         
         # Initialize Silero VAD if available
         self.silero_session = None
@@ -75,13 +97,16 @@ class VoiceActivityDetector:
             else:
                 logger.warning(f"Silero VAD model path configured but file does not exist: {model_path}")
         
-        # Initialize webrtcvad if available
+        # Initialize webrtcvad if available (skipped when force_rms=True)
         self.vad = None
-        if WEBRTCVAD_AVAILABLE:
+        if WEBRTCVAD_AVAILABLE and not self.force_rms:
             try:
                 self.vad = webrtcvad.Vad(webrtcvad_mode)
+                logger.info("webrtcvad initialised successfully (mode %d).", webrtcvad_mode)
             except Exception as e:
                 logger.error(f"Failed to initialize webrtcvad: {e}. Using RMS fallback.")
+        elif self.force_rms:
+            logger.info("VAD: force_rms=True — using RMS threshold only, webrtcvad disabled.")
 
         # State tracking
         self.reset()
@@ -93,7 +118,14 @@ class VoiceActivityDetector:
         self.silence_accumulated_ms = 0.0
         self.last_speech_time_ms = 0.0
         self.total_processed_ms = 0.0
-        
+
+        # Rolling pre-speech buffer: a deque used as a ring-buffer.
+        # We store raw bytes (as chunks) and cap total stored bytes to
+        # _pre_speech_max_bytes so we always have the last N ms of audio
+        # ready to prepend when speech is first detected.
+        self._pre_speech_chunks: collections.deque = collections.deque()
+        self._pre_speech_bytes_stored: int = 0
+
         # Reset Silero VAD state
         if self.silero_session is not None:
             self.silero_state = np.zeros((2, 1, 64), dtype=np.float32)
@@ -160,7 +192,19 @@ class VoiceActivityDetector:
             self.total_processed_ms = len(self.audio_buffer) / self.bytes_per_ms
             processed_bytes = len(self.audio_buffer)
             
-        # Append new chunk to the buffer
+        # If speech has not yet been detected, keep the rolling pre-speech buffer
+        # topped up with the incoming chunk so that when speech IS detected we can
+        # prepend the last ~500 ms of audio and avoid front-clipping.
+        speech_was_detected_before_chunk = self.speech_detected
+        if not speech_was_detected_before_chunk:
+            self._pre_speech_chunks.append(bytes(chunk))
+            self._pre_speech_bytes_stored += len(chunk)
+            # Evict oldest chunks until we are within the rolling window
+            while self._pre_speech_bytes_stored > self._pre_speech_max_bytes and self._pre_speech_chunks:
+                evicted = self._pre_speech_chunks.popleft()
+                self._pre_speech_bytes_stored -= len(evicted)
+
+        # Append new chunk to the utterance buffer
         self.audio_buffer.extend(chunk)
         
         # Process new complete frames in the buffer
@@ -174,8 +218,45 @@ class VoiceActivityDetector:
             
             if is_speech:
                 if not self.speech_detected:
-                    logger.info("VAD: Speech detected (start of utterance).")
+                    logger.info("VAD: Speech detected (start of utterance). Prepending pre-speech buffer.")
                     self.speech_detected = True
+
+                    # ── Pre-speech buffer prepend ─────────────────────────────
+                    # Collect the rolling buffer bytes captured before this chunk.
+                    # Exclude the current chunk itself (it's already in audio_buffer).
+                    pre_bytes = bytearray()
+                    for ch in self._pre_speech_chunks:
+                        if ch is not bytes(chunk):  # skip the chunk we just added
+                            pre_bytes.extend(ch)
+
+                    # Remove the current chunk from the tail of the pre-speech
+                    # deque (it was added above) before prepending.
+                    if self._pre_speech_chunks and self._pre_speech_chunks[-1] == bytes(chunk):
+                        self._pre_speech_chunks.pop()
+                        self._pre_speech_bytes_stored -= len(chunk)
+                        pre_bytes = bytearray()
+                        for ch in self._pre_speech_chunks:
+                            pre_bytes.extend(ch)
+
+                    if pre_bytes:
+                        pre_duration_ms = len(pre_bytes) / self.bytes_per_ms
+                        logger.info(
+                            "VAD: Prepending %.0f ms of pre-speech audio to utterance buffer.",
+                            pre_duration_ms,
+                        )
+                        self.audio_buffer = pre_bytes + self.audio_buffer
+                        # Shift processed_bytes and time counters forward so
+                        # the frames we just processed are still considered
+                        # processed relative to the newly extended buffer start.
+                        processed_bytes += len(pre_bytes)
+                        self.total_processed_ms += pre_duration_ms
+                        self.last_speech_time_ms += pre_duration_ms
+
+                    # Clear the pre-speech buffer — no longer needed
+                    self._pre_speech_chunks.clear()
+                    self._pre_speech_bytes_stored = 0
+                    # ─────────────────────────────────────────────────────────
+
                 self.silence_accumulated_ms = 0.0
                 self.last_speech_time_ms = self.total_processed_ms
             else:
@@ -216,8 +297,8 @@ class VoiceActivityDetector:
             except Exception as e:
                 logger.error(f"Silero VAD inference error: {e}. Falling back to other VAD methods.")
                 
-        # 2. Try webrtcvad if available
-        if self.vad is not None:
+        # 2. Try webrtcvad if available (only when force_rms is not set)
+        if self.vad is not None and not self.force_rms:
             try:
                 # webrtcvad expects exact frame size and 16-bit mono PCM.
                 # If these conditions are met, run it.

@@ -17,11 +17,12 @@ class Settings(BaseSettings):
     TWILIO_WHATSAPP_FROM: str
     SECRET_KEY: str
     MAX_CONCURRENT_CALLS: int = 10
-    SILENCE_THRESHOLD_MS: int = 1000
-    VAD_RMS_THRESHOLD: float = 500.0
+    SILENCE_THRESHOLD_MS: int = 1300
+    VAD_RMS_THRESHOLD: float = 300.0
     VAD_SAMPLE_RATE: int = 16000
     VAD_CHANNELS: int = 1
     VAD_SAMPLE_WIDTH: int = 2
+    VAD_PRE_SPEECH_DURATION_MS: int = 500
 
     # VAD
     SILERO_MODEL_PATH: str = ""
