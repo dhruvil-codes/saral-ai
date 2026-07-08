@@ -116,15 +116,22 @@ def _fireworks_chat(
     api_key: str,
     tools: Optional[List[Dict]] = None,
     tool_choice: Optional[str] = None,
+    _max_retries: int = 3,
 ) -> Dict[str, Any]:
     """
     Low-level synchronous POST to Fireworks /chat/completions.
     Returns the full parsed JSON response dict.
     Raises httpx.TimeoutException, httpx.HTTPStatusError, or RuntimeError on failure.
+
+    Retries up to _max_retries times on the intermittent Fireworks
+    "model output must contain either output text or tool calls" 500 error.
     """
+    import time
+
     payload: Dict[str, Any] = {
         "model": model,
         "messages": messages,
+        "stream": True,
     }
     if tools:
         payload["tools"] = tools
@@ -132,42 +139,142 @@ def _fireworks_chat(
         payload["tool_choice"] = tool_choice
 
     logger.debug(
-        "[fireworks_llm] POST %s/chat/completions model=%s messages=%d",
+        "[fireworks_llm] POST %s/chat/completions model=%s messages=%d (streaming enabled)",
         FIREWORKS_API_BASE,
         model,
         len(messages),
     )
 
-    try:
-        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
-            response = client.post(
-                f"{FIREWORKS_API_BASE}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                json=payload,
+    last_exc: Exception = RuntimeError("No attempts made")
+    for attempt in range(1, _max_retries + 1):
+        try:
+            with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+                with client.stream(
+                    "POST",
+                    f"{FIREWORKS_API_BASE}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "Accept": "text/event-stream",
+                    },
+                    json=payload,
+                ) as response:
+                    response.raise_for_status()
+                    
+                    full_content = []
+                    tool_calls_builder = {}
+                    ttft = None
+                    t0 = time.perf_counter()
+                    
+                    for line in response.iter_lines():
+                        if not line.strip():
+                            continue
+                        if line.startswith("data:"):
+                            data_str = line[len("data:"):].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                choices_list = chunk.get("choices") or []
+                                if not choices_list:
+                                    continue
+                                delta = choices_list[0].get("delta") or {}
+                                
+                                # First token/action timing
+                                if ttft is None and (delta.get("content") or delta.get("tool_calls")):
+                                    ttft = time.perf_counter() - t0
+                                    logger.info("[fireworks_llm] TTFT: %.3fs", ttft)
+                                
+                                content = delta.get("content")
+                                if content:
+                                    full_content.append(content)
+                                    
+                                tool_calls = delta.get("tool_calls")
+                                if tool_calls:
+                                    for tc in tool_calls:
+                                        idx = tc.get("index")
+                                        if idx is None:
+                                            continue
+                                        if idx not in tool_calls_builder:
+                                            tool_calls_builder[idx] = {
+                                                "id": tc.get("id", ""),
+                                                "type": tc.get("type", "function"),
+                                                "function": {
+                                                    "name": tc.get("function", {}).get("name", ""),
+                                                    "arguments": ""
+                                                }
+                                            }
+                                        else:
+                                            if "id" in tc and tc["id"]:
+                                                tool_calls_builder[idx]["id"] = tc["id"]
+                                        
+                                        func = tc.get("function") or {}
+                                        name_delta = func.get("name", "")
+                                        if name_delta:
+                                            tool_calls_builder[idx]["function"]["name"] += name_delta
+                                        args_delta = func.get("arguments", "")
+                                        if args_delta:
+                                            tool_calls_builder[idx]["function"]["arguments"] += args_delta
+                            except Exception as parse_err:
+                                logger.warning("[fireworks_llm] Stream chunk parse error: %s", parse_err)
+                    
+                    reconstructed_tool_calls = []
+                    if tool_calls_builder:
+                        for idx in sorted(tool_calls_builder.keys()):
+                            reconstructed_tool_calls.append(tool_calls_builder[idx])
+                            
+                    text_response = "".join(full_content)
+                    total_dur = time.perf_counter() - t0
+                    logger.info("[fireworks_llm] Completed stream. TTFT: %s, Total: %.3fs", 
+                                f"{ttft:.3f}s" if ttft is not None else "N/A", total_dur)
+                    
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "role": "assistant",
+                                    "content": text_response,
+                                    "tool_calls": reconstructed_tool_calls or None
+                                }
+                            }
+                        ]
+                    }
+        except httpx.TimeoutException:
+            # Re-raise timeouts immediately — no point retrying a slow call
+            raise
+        except httpx.HTTPStatusError as hse:
+            body = hse.response.text
+            is_empty_output_error = (
+                hse.response.status_code in (500, 400)
+                and "model output must contain either output text" in body
             )
-            response.raise_for_status()
-            return response.json()
-    except httpx.TimeoutException:
-        # Re-raise as-is so ws_call.py can catch it by type
-        raise
-    except httpx.HTTPStatusError as hse:
-        logger.error(
-            "[fireworks_llm] HTTP %s from Fireworks API during live call: %s",
-            hse.response.status_code,
-            hse.response.text[:500],
-        )
-        raise
-    except Exception as exc:
-        logger.error(
-            "[fireworks_llm] Unexpected error calling Fireworks API: %s",
-            exc,
-            exc_info=True,
-        )
-        raise RuntimeError(f"Unexpected error calling Fireworks AI: {exc}") from exc
+            if is_empty_output_error and attempt < _max_retries:
+                wait = 0.5 * attempt
+                logger.warning(
+                    "[fireworks_llm] Empty-output error on attempt %d/%d — retrying in %.1fs",
+                    attempt, _max_retries, wait,
+                )
+                time.sleep(wait)
+                last_exc = hse
+                continue
+            # Non-retryable HTTP error or final attempt — log and re-raise
+            logger.error(
+                "[fireworks_llm] HTTP %s from Fireworks API (attempt %d/%d): %s",
+                hse.response.status_code, attempt, _max_retries,
+                body[:500],
+            )
+            raise
+        except Exception as exc:
+            logger.error(
+                "[fireworks_llm] Unexpected error calling Fireworks API: %s",
+                exc,
+                exc_info=True,
+            )
+            raise RuntimeError(f"Unexpected error calling Fireworks AI: {exc}") from exc
+
+    # Exhausted retries on the empty-output error — re-raise the last one
+    raise last_exc
+
 
 
 def get_response(
@@ -441,4 +548,355 @@ def get_response(
         raise RuntimeError(
             f"An unexpected error occurred while calling Fireworks AI: {exc}"
         ) from exc
+
+
+async def _fireworks_chat_stream_async(
+    messages: List[Dict[str, Any]],
+    model: str,
+    api_key: str,
+    tools: Optional[List[Dict]] = None,
+    tool_choice: Optional[str] = None,
+    _max_retries: int = 3,
+):
+    import asyncio
+    payload: Dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+    }
+    if tools:
+        payload["tools"] = tools
+    if tool_choice:
+        payload["tool_choice"] = tool_choice
+
+    logger.debug(
+        "[fireworks_llm] Async Stream POST %s/chat/completions model=%s messages=%d",
+        FIREWORKS_API_BASE,
+        model,
+        len(messages),
+    )
+
+    last_exc: Exception = RuntimeError("No attempts made")
+    for attempt in range(1, _max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+                async with client.stream(
+                    "POST",
+                    f"{FIREWORKS_API_BASE}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "Accept": "text/event-stream",
+                    },
+                    json=payload,
+                ) as response:
+                    response.raise_for_status()
+                    
+                    tool_calls_builder = {}
+                    ttft = None
+                    t0 = time.perf_counter()
+                    
+                    async for line in response.aiter_lines():
+                        if not line.strip():
+                            continue
+                        if line.startswith("data:"):
+                            data_str = line[len("data:"):].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                choices_list = chunk.get("choices") or []
+                                if not choices_list:
+                                    continue
+                                delta = choices_list[0].get("delta") or {}
+                                
+                                # First token/action timing
+                                if ttft is None and (delta.get("content") or delta.get("tool_calls")):
+                                    ttft = time.perf_counter() - t0
+                                    logger.info("[fireworks_llm] Async TTFT: %.3fs", ttft)
+                                
+                                content = delta.get("content")
+                                if content:
+                                    yield {"type": "content", "content": content}
+                                    
+                                tool_calls = delta.get("tool_calls")
+                                if tool_calls:
+                                    for tc in tool_calls:
+                                        idx = tc.get("index")
+                                        if idx is None:
+                                            continue
+                                        if idx not in tool_calls_builder:
+                                            tool_calls_builder[idx] = {
+                                                "id": tc.get("id", ""),
+                                                "type": tc.get("type", "function"),
+                                                "function": {
+                                                    "name": tc.get("function", {}).get("name", ""),
+                                                    "arguments": ""
+                                                }
+                                            }
+                                        else:
+                                            if "id" in tc and tc["id"]:
+                                                tool_calls_builder[idx]["id"] = tc["id"]
+                                        
+                                        func = tc.get("function") or {}
+                                        name_delta = func.get("name", "")
+                                        if name_delta:
+                                            tool_calls_builder[idx]["function"]["name"] += name_delta
+                                        args_delta = func.get("arguments", "")
+                                        if args_delta:
+                                            tool_calls_builder[idx]["function"]["arguments"] += args_delta
+                            except Exception as parse_err:
+                                logger.warning("[fireworks_llm] Stream chunk parse error: %s", parse_err)
+                    
+                    reconstructed_tool_calls = []
+                    if tool_calls_builder:
+                        for idx in sorted(tool_calls_builder.keys()):
+                            reconstructed_tool_calls.append(tool_calls_builder[idx])
+                        yield {"type": "tool_calls", "tool_calls": reconstructed_tool_calls}
+                            
+                    total_dur = time.perf_counter() - t0
+                    logger.info("[fireworks_llm] Async Stream finished. TTFT: %s, Total: %.3fs", 
+                                f"{ttft:.3f}s" if ttft is not None else "N/A", total_dur)
+                    return
+        except httpx.TimeoutException:
+            raise
+        except httpx.HTTPStatusError as hse:
+            body = hse.response.text
+            is_empty_output_error = (
+                hse.response.status_code in (500, 400)
+                and "model output must contain either output text" in body
+            )
+            if is_empty_output_error and attempt < _max_retries:
+                wait = 0.5 * attempt
+                logger.warning(
+                    "[fireworks_llm] Empty-output error on attempt %d/%d — retrying in %.1fs",
+                    attempt, _max_retries, wait,
+                )
+                await asyncio.sleep(wait)
+                last_exc = hse
+                continue
+            logger.error(
+                "[fireworks_llm] HTTP %s from Fireworks API (attempt %d/%d): %s",
+                hse.response.status_code, attempt, _max_retries,
+                body[:500],
+            )
+            raise
+        except Exception as exc:
+            logger.error(
+                "[fireworks_llm] Unexpected error calling Fireworks API: %s",
+                exc,
+                exc_info=True,
+            )
+            raise RuntimeError(f"Unexpected error calling Fireworks AI: {exc}") from exc
+
+    raise last_exc
+
+
+async def get_response_stream_async(
+    user_message: str,
+    conversation_history: List[Dict[str, Any]],
+    system_prompt: str = None,
+    user_id: Optional[str] = None,
+    call_id: Optional[str] = None,
+):
+    api_key = os.getenv("FIREWORKS_API_KEY")
+    if not api_key or api_key == "placeholder-fireworks-key":
+        raise ValueError(
+            "FIREWORKS_API_KEY environment variable is not set or contains a placeholder value."
+        )
+
+    model = os.getenv("FIREWORKS_MODEL", DEFAULT_MODEL)
+
+    messages: List[Dict[str, Any]] = []
+    for msg in conversation_history:
+        if isinstance(msg, dict) and "role" in msg and "content" in msg:
+            role = str(msg["role"]).strip().lower()
+            if role not in ["system", "user", "assistant", "tool"]:
+                role = "user"
+            messages.append({"role": role, "content": str(msg["content"])})
+
+    default_sys = (
+        "You are a helpful receptionist AI assistant for Saral AI. "
+        "If the caller wants to book or reserve an appointment, you must first call the "
+        "hold_appointment_slot tool to check and temporarily hold the slot. "
+        "After calling hold_appointment_slot, you MUST explicitly read back the critical "
+        "information (date, time, and caller phone number if known) and ask for confirmation. "
+        "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', "
+        "'correct', 'haan', or confirms) after you read back the details. "
+        "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering "
+        "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
+        "or 12 PM.')."
+    )
+    sys_content = system_prompt or default_sys
+
+    hinglish_instruction = (
+        "\n\n[LANGUAGE GUIDELINE: The user will frequently speak in \"Hinglish\" "
+        "(a mix of Hindi and English). "
+        "You must perfectly understand this mix. Always reply in the same natural, conversational "
+        "language the user is speaking. "
+        "Do not use overly formal Hindi; use natural, everyday Hinglish.]"
+    )
+    if "[LANGUAGE GUIDELINE:" not in sys_content:
+        sys_content += hinglish_instruction
+
+    booking_instructions = (
+        "\n\n[CRITICAL APPOINTMENT BOOKING RULES]:\n"
+        "1. If the caller wants to book or reserve an appointment, you must first call the "
+        "hold_appointment_slot tool with the requested slot.\n"
+        "2. After calling hold_appointment_slot, you MUST explicitly read back the critical "
+        "information (date, time, and caller phone number if known) to confirm with the caller. "
+        "E.g., 'Just to confirm - Tuesday 15th at 10am, phone number 9820XXXXXX - is that correct?'\n"
+        "3. Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', "
+        "'correct', 'haan', or confirms) after you read back the details.\n"
+        "4. You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering "
+        "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
+        "or 12 PM.')."
+    )
+    if user_id and "[CRITICAL APPOINTMENT BOOKING RULES]" not in sys_content:
+        sys_content += booking_instructions
+
+    strict_datetime_instructions = (
+        "\n\n[STRICT DATETIME RESOLUTION RULE]:\n"
+        "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
+        "If a user provides a vague time, you must immediately ask them to clarify by offering "
+        "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
+        "or 12 PM.')."
+    )
+    if "[STRICT DATETIME RESOLUTION RULE]" not in sys_content:
+        sys_content += strict_datetime_instructions
+
+    system_index = -1
+    for i, m in enumerate(messages):
+        if m["role"] == "system":
+            system_index = i
+            break
+
+    if system_index != -1:
+        messages[system_index]["content"] = sys_content
+    else:
+        messages.insert(0, {"role": "system", "content": sys_content})
+
+    messages.append({"role": "user", "content": user_message})
+
+    kwargs: Dict[str, Any] = {}
+    if user_id:
+        kwargs["tools"] = BOOKING_TOOLS
+        kwargs["tool_choice"] = "auto"
+
+    tool_calls = []
+    text_content = []
+    
+    async for event in _fireworks_chat_stream_async(messages=messages, model=model, api_key=api_key, **kwargs):
+        if event["type"] == "content":
+            text_content.append(event["content"])
+            yield event["content"]
+        elif event["type"] == "tool_calls":
+            tool_calls = event["tool_calls"]
+
+    if tool_calls:
+        for tool_call in tool_calls:
+            tool_name = tool_call["function"]["name"]
+            if tool_name not in ["hold_appointment_slot", "confirm_appointment"]:
+                continue
+
+            try:
+                args = json.loads(tool_call["function"]["arguments"])
+                slot_dt = args.get("slot_datetime")
+            except Exception:
+                slot_dt = None
+
+            logger.info(
+                "[fireworks_llm] LLM requested booking tool call '%s' for slot: %s",
+                tool_name,
+                slot_dt,
+            )
+
+            if slot_dt and user_id:
+                if tool_name == "hold_appointment_slot":
+                    if not is_valid_iso_datetime(slot_dt):
+                        db_result = {
+                            "success": False,
+                            "error": "INVALID_DATETIME_FORMAT",
+                            "message": (
+                                "Validation Error: The slot_datetime must be a precise, "
+                                "valid ISO-8601 datetime string. Vague inputs like 'morning', "
+                                "'afternoon', or 'kal subah' are not allowed. You must "
+                                "immediately ask the user to clarify and offer specific slots "
+                                "(e.g., 10 AM, 11 AM, or 12 PM)."
+                            ),
+                        }
+                    else:
+                        db_result = hold_booking_slot(
+                            user_id=user_id, slot_datetime=slot_dt, call_id=call_id
+                        )
+                else:
+                    db_result = confirm_booking_slot(
+                        user_id=user_id, slot_datetime=slot_dt
+                    )
+            else:
+                db_result = {
+                    "success": False,
+                    "error": "INVALID_SLOT",
+                    "message": "Missing slot datetime or user ID",
+                }
+
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": "".join(text_content),
+                    "tool_calls": [
+                        {
+                            "id": tool_call["id"],
+                            "type": "function",
+                            "function": {
+                                "name": tool_call["function"]["name"],
+                                "arguments": tool_call["function"]["arguments"],
+                            },
+                        }
+                    ],
+                }
+            )
+
+            if db_result["success"]:
+                if tool_name == "hold_appointment_slot":
+                    tool_output = json.dumps({
+                        "status": "success",
+                        "message": f"Appointment slot {slot_dt} is now held as pending for 10 minutes.",
+                    })
+                else:
+                    tool_output = json.dumps({
+                        "status": "success",
+                        "message": f"Appointment slot {slot_dt} has been successfully confirmed.",
+                    })
+            elif db_result.get("error") == "SLOT_TAKEN":
+                tool_output = json.dumps({
+                    "status": "error",
+                    "reason": "SLOT_TAKEN",
+                    "message": "The requested slot is already taken or held by another booking.",
+                })
+            elif db_result.get("error") == "NO_PENDING_SLOT":
+                tool_output = json.dumps({
+                    "status": "error",
+                    "reason": "NO_PENDING_SLOT",
+                    "message": "No pending reservation was found for this time slot. It may have expired.",
+                })
+            else:
+                tool_output = json.dumps({
+                    "status": "error",
+                    "reason": db_result.get("error"),
+                    "message": db_result.get("message"),
+                })
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call["id"],
+                "content": tool_output,
+            })
+
+            async for event in _fireworks_chat_stream_async(messages=messages, model=model, api_key=api_key):
+                if event["type"] == "content":
+                    yield event["content"]
+
 
