@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from app.services.sarvam import speech_to_text, text_to_speech, text_to_speech_stream
-from app.services.fireworks_llm import get_response
+from app.services.fireworks_llm import get_response, get_response_stream_async
 from app.services.fallback_audio import get_fallback_audio
 from app.utils.vad import VoiceActivityDetector
 from app.services.intent_cache import semantic_cache
@@ -382,45 +382,124 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     except Exception as rag_err:
                         logger.error(f"RAG: Error fetching FAQs: {rag_err}", exc_info=True)
 
-                # 5. Get LLM response
-                logger.info("Getting response from Fireworks AI LLM...")
+                # 5. Get LLM response stream
+                logger.info("Getting streaming response from Fireworks AI LLM...")
                 llm_start = time.perf_counter()
                 
                 llm_reply = None
-                try:
-                    llm_reply = await asyncio.wait_for(
-                        run_in_threadpool(get_response, transcript, conversation_history[:-1], system_prompt, user_id, call_id),
-                        timeout=4.0
+                tts_audio_chunks = []
+                chunks_received = []
+
+                async def consume_llm_stream(user_prompt, history, sys_prompt, timeout_val):
+                    stream_gen = get_response_stream_async(
+                        user_prompt,
+                        history,
+                        sys_prompt,
+                        user_id,
+                        call_id
                     )
-                except asyncio.TimeoutError as te:
-                    logger.error(f"LLM Timeout Error on first attempt: {str(te)}", exc_info=True)
-                except httpx.TimeoutException as te:
-                    logger.error(f"LLM HTTP Timeout Exception on first attempt: {str(te)}", exc_info=True)
-                except httpx.HTTPStatusError as hse:
-                    logger.error(f"LLM HTTP Status Error on first attempt: {str(hse)}", exc_info=True)
-                except Exception as e:
-                    logger.error(f"LLM General Failure on first attempt: {str(e)}", exc_info=True)
- 
-                if llm_reply is None:
-                    # Retry once with a shorter prompt
-                    logger.info("Retrying LLM once with a shorter prompt...")
-                    shorter_transcript = transcript[:50] if len(transcript) > 50 else transcript
+                    iterator = stream_gen.__aiter__()
                     try:
-                        llm_reply = await asyncio.wait_for(
-                            run_in_threadpool(get_response, shorter_transcript, conversation_history[:-1], system_prompt, user_id, call_id),
-                            timeout=3.0
-                        )
-                        logger.info(f"LLM Reply on retry: {llm_reply}")
-                    except asyncio.TimeoutError as te:
-                        logger.error(f"LLM Timeout Error on retry: {str(te)}", exc_info=True)
-                    except httpx.TimeoutException as te:
-                        logger.error(f"LLM HTTP Timeout Exception on retry: {str(te)}", exc_info=True)
-                    except httpx.HTTPStatusError as hse:
-                        logger.error(f"LLM HTTP Status Error on retry: {str(hse)}", exc_info=True)
-                    except Exception as e:
-                        logger.error(f"LLM General Failure on retry: {str(e)}", exc_info=True)
- 
-                if llm_reply is None:
+                        first_chunk = await asyncio.wait_for(iterator.__anext__(), timeout=timeout_val)
+                        chunks_received.append(first_chunk)
+                        yield first_chunk
+                    except (asyncio.TimeoutError, StopAsyncIteration) as e:
+                        if isinstance(e, asyncio.TimeoutError):
+                            raise
+                        return
+                    
+                    while True:
+                        try:
+                            chunk = await asyncio.wait_for(iterator.__anext__(), timeout=5.0)
+                            chunks_received.append(chunk)
+                            yield chunk
+                        except StopAsyncIteration:
+                            break
+                        except asyncio.TimeoutError:
+                            logger.warning("[ws_call] LLM chunk read timeout mid-generation")
+                            break
+
+                async def sentence_generator(chunk_gen):
+                    buffer = ""
+                    sentence_end_chars = {'.', '?', '!', ',', ';', '।'}
+                    async for token in chunk_gen:
+                        buffer += token
+                        while True:
+                            split_idx = -1
+                            for idx, char in enumerate(buffer):
+                                if char in sentence_end_chars:
+                                    # Avoid splitting on decimals (e.g. "9.30")
+                                    is_decimal = (char in {'.', ','} and 
+                                                  idx > 0 and idx < len(buffer) - 1 and 
+                                                  buffer[idx-1].isdigit() and buffer[idx+1].isdigit())
+                                    if not is_decimal:
+                                        split_idx = idx
+                                        break
+                            if split_idx != -1:
+                                sentence = buffer[:split_idx+1].strip()
+                                buffer = buffer[split_idx+1:]
+                                if sentence:
+                                    yield sentence
+                            else:
+                                break
+                    if buffer.strip():
+                        yield buffer.strip()
+
+                try:
+                    logger.info("Attempting LLM stream first try...")
+                    chunks_received = []
+                    chunk_gen = consume_llm_stream(transcript, conversation_history[:-1], system_prompt, 4.0)
+                    
+                    tts_started = False
+                    
+                    async for sentence in sentence_generator(chunk_gen):
+                        if not tts_started:
+                            await websocket.send_json({"status": "tts_start"})
+                            tts_started = True
+                        logger.info(f"Streaming sentence to TTS: {sentence}")
+                        async for chunk in text_to_speech_stream(sentence, language):
+                            if chunk:
+                                await websocket.send_bytes(chunk)
+                                tts_audio_chunks.append(chunk)
+                                
+                    if tts_started:
+                        await websocket.send_json({"status": "tts_end"})
+                    llm_reply = "".join(chunks_received)
+                except Exception as err:
+                    logger.warning(f"First LLM stream attempt failed: {err}")
+                    if not chunks_received:
+                        # Retry once with a shorter prompt
+                        logger.info("Retrying LLM stream with shorter prompt...")
+                        shorter_transcript = transcript[:50] if len(transcript) > 50 else transcript
+                        try:
+                            chunks_received = []
+                            chunk_gen = consume_llm_stream(shorter_transcript, conversation_history[:-1], system_prompt, 3.0)
+                            
+                            tts_started = False
+                            
+                            async for sentence in sentence_generator(chunk_gen):
+                                if not tts_started:
+                                    await websocket.send_json({"status": "tts_start"})
+                                    tts_started = True
+                                logger.info(f"Streaming sentence to TTS (retry): {sentence}")
+                                async for chunk in text_to_speech_stream(sentence, language):
+                                    if chunk:
+                                        await websocket.send_bytes(chunk)
+                                        tts_audio_chunks.append(chunk)
+                                        
+                            if tts_started:
+                                await websocket.send_json({"status": "tts_end"})
+                            llm_reply = "".join(chunks_received)
+                        except Exception as retry_err:
+                            logger.error(f"LLM retry failed: {retry_err}", exc_info=True)
+                            llm_reply = None
+                    else:
+                        # If we got some chunks but failed mid-stream, finish gracefully
+                        if tts_started:
+                            await websocket.send_json({"status": "tts_end"})
+                        llm_reply = "".join(chunks_received)
+
+                if llm_reply is None or not llm_reply.strip():
                     llm_failure_count += 1
                     logger.warning(f"LLM response generation failed. Consecutive failure count: {llm_failure_count}")
                     
@@ -440,21 +519,18 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         except Exception as tts_err:
                             logger.error(f"Failed to play final emergency audio: {tts_err}")
                         
-                        # Trigger background task to alert business owner
                         from app.workers.tasks import send_emergency_callback_whatsapp
                         asyncio.create_task(send_emergency_callback_whatsapp(caller_number))
                         
-                        # Gracefully close WebSocket and break loop
                         await websocket.close(code=1000)
                         break
                     else:
-                        # Fall back to "Let me have someone call you back" clip
                         await _play_fallback_audio(websocket, "llm_fallback", language)
                         continue
                 else:
-                    # Reset failure count on successful response
                     llm_failure_count = 0
- 
+
+                # If successful, logger and metrics
                 llm_end = time.perf_counter()
                 llm_ms = int(round((llm_end - llm_start) * 1000))
                 logger.info(f"LLM Reply: {llm_reply}")
@@ -465,75 +541,27 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     "content": llm_reply
                 })
                 
-                # Cap history size again
                 if len(conversation_history) > MAX_HISTORY:
                     conversation_history = conversation_history[-MAX_HISTORY:]
                 
-                # 7. Text to Speech Streaming
-                logger.info("Synthesizing response to speech via stream...")
-                tts_start = time.perf_counter()
+                # Record tts duration for stats
+                tts_ms = int(round((time.perf_counter() - llm_end) * 1000))
+                logger.info(f"Streamed TTS audio chunks ({len(tts_audio_chunks)} chunks) back to client in {tts_ms}ms.")
                 
-                # Send control message indicating TTS has started
-                await websocket.send_json({
-                    "status": "tts_start"
-                })
-                
-                # Stream the chunks over the websocket
-                chunks_count = 0
-                total_bytes = 0
-                tts_audio_chunks = []
-                
-                async def stream_tts():
-                    nonlocal chunks_count, total_bytes
-                    async for chunk in text_to_speech_stream(llm_reply, language):
-                        if chunk:
-                            chunks_count += 1
-                            total_bytes += len(chunk)
-                            tts_audio_chunks.append(chunk)
-                            await websocket.send_bytes(chunk)
- 
-                try:
-                    await asyncio.wait_for(stream_tts(), timeout=20.0)
-                    
-                    # Send control message indicating TTS has finished
-                    await websocket.send_json({
-                        "status": "tts_end"
-                    })
-                    
-                    tts_end = time.perf_counter()
-                    tts_ms = int(round((tts_end - tts_start) * 1000))
-                    logger.info(f"Streamed {chunks_count} chunks ({total_bytes} bytes) back to client in {tts_ms}ms.")
-                    
-                    # Save to semantic cache on successful completion of turn
-                    if llm_reply and tts_audio_chunks:
-                        try:
-                            emb = await semantic_cache.embed_text(transcript)
-                            semantic_cache.add(
-                                text=transcript,
-                                response=llm_reply,
-                                language=language,
-                                embedding=emb,
-                                audio_bytes=b"".join(tts_audio_chunks)
-                            )
-                            logger.info("Successfully cached new user intent & TTS audio.")
-                        except Exception as cache_save_err:
-                            logger.warning(f"Failed to cache response: {cache_save_err}")
-                except asyncio.TimeoutError as te:
-                    logger.error(f"TTS Timeout Error during streaming: {str(te)}", exc_info=True)
-                    await websocket.close(code=1000)
-                    break
-                except httpx.TimeoutException as te:
-                    logger.error(f"TTS HTTP Timeout Exception during streaming: {str(te)}", exc_info=True)
-                    await websocket.close(code=1000)
-                    break
-                except httpx.HTTPStatusError as hse:
-                    logger.error(f"TTS HTTP Status Error during streaming: {str(hse)}", exc_info=True)
-                    await websocket.close(code=1000)
-                    break
-                except Exception as e:
-                    logger.error(f"TTS General Failure during streaming: {str(e)}", exc_info=True)
-                    await websocket.close(code=1000)
-                    break
+                # Save to semantic cache on successful completion of turn
+                if llm_reply and tts_audio_chunks:
+                    try:
+                        emb = await semantic_cache.embed_text(transcript)
+                        semantic_cache.add(
+                            text=transcript,
+                            response=llm_reply,
+                            language=language,
+                            embedding=emb,
+                            audio_bytes=b"".join(tts_audio_chunks)
+                        )
+                        logger.info("Successfully cached new user intent & TTS audio.")
+                    except Exception as cache_save_err:
+                        logger.warning(f"Failed to cache response: {cache_save_err}")
                 
                 # 9. Structured latency logging
                 total_ms = stt_ms + llm_ms + tts_ms
