@@ -143,15 +143,18 @@ class TestServices(unittest.TestCase):
     def test_fireworks_llm_mocked(self, mock_httpx_client):
         """Test Fireworks LLM integration and message formatting under mock."""
         fake_response = MagicMock()
-        fake_response.json.return_value = {
-            "choices": [{"message": {"content": "This is a mock reply from receptionist.", "tool_calls": None}}]
-        }
+        fake_response.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "This is a mock reply from receptionist."}}]}',
+            'data: [DONE]'
+        ]
         fake_response.raise_for_status.return_value = None
 
         mock_client_instance = MagicMock()
         mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
         mock_client_instance.__exit__ = MagicMock(return_value=False)
-        mock_client_instance.post.return_value = fake_response
+        fake_response.__enter__ = MagicMock(return_value=fake_response)
+        fake_response.__exit__ = MagicMock(return_value=False)
+        mock_client_instance.stream.return_value = fake_response
         mock_httpx_client.return_value = mock_client_instance
 
         with patch.dict(os.environ, {"FIREWORKS_API_KEY": "test-fireworks-key"}):
@@ -163,8 +166,8 @@ class TestServices(unittest.TestCase):
             self.assertEqual(response, "This is a mock reply from receptionist.")
 
             # Verify system prompt prepending and user message addition
-            post_call = mock_client_instance.post.call_args
-            messages_sent = post_call[1]["json"]["messages"]
+            stream_call = mock_client_instance.stream.call_args
+            messages_sent = stream_call[1]["json"]["messages"]
 
             self.assertEqual(messages_sent[0]["role"], "system")
             self.assertEqual(messages_sent[1]["role"], "user")

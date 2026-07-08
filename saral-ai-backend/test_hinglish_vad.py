@@ -167,26 +167,29 @@ class TestHinglishAndVAD(unittest.TestCase):
         """
         # Build a fake httpx response that fireworks_llm expects
         fake_response = MagicMock()
-        fake_response.json.return_value = {
-            "choices": [{"message": {"content": "Mocked response", "tool_calls": None}}]
-        }
+        fake_response.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "Mocked response"}}]}',
+            'data: [DONE]'
+        ]
         fake_response.raise_for_status.return_value = None
 
         mock_client_instance = MagicMock()
         mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
         mock_client_instance.__exit__ = MagicMock(return_value=False)
-        mock_client_instance.post.return_value = fake_response
+        fake_response.__enter__ = MagicMock(return_value=fake_response)
+        fake_response.__exit__ = MagicMock(return_value=False)
+        mock_client_instance.stream.return_value = fake_response
         mock_httpx_client.return_value = mock_client_instance
 
         with patch.dict(os.environ, {"FIREWORKS_API_KEY": "test-valid-key"}):
             # Run get_response with custom system prompt and check system messages sent to Fireworks
             get_response("Mera appointment coordinate karo", [], system_prompt="Test base prompt")
 
-            # Check calls to httpx post
-            post_calls = mock_client_instance.post.call_args_list
-            self.assertEqual(len(post_calls), 1)
+            # Check calls to httpx stream
+            stream_calls = mock_client_instance.stream.call_args_list
+            self.assertEqual(len(stream_calls), 1)
 
-            sent_payload = post_calls[0][1]["json"]
+            sent_payload = stream_calls[0][1]["json"]
             sent_messages = sent_payload["messages"]
             system_messages = [m for m in sent_messages if m["role"] == "system"]
             self.assertTrue(len(system_messages) > 0)

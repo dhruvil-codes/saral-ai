@@ -6,18 +6,37 @@ from unittest.mock import patch, MagicMock
 # Make sure app is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.main import app
 from fastapi.testclient import TestClient
+from app.main import app
+
+from app.api.ws_call import semantic_cache
+import numpy as np
+
+# Globally mock semantic_cache lookup, add and embed_text to prevent downloading SentenceTransformer model
+async def mock_lookup(text, language="en-IN"):
+    return None
+semantic_cache.lookup = mock_lookup
+
+def mock_add(*args, **kwargs):
+    pass
+semantic_cache.add = mock_add
+
+async def mock_embed_text(text):
+    return np.zeros(384)
+semantic_cache.embed_text = mock_embed_text
 
 class TestWebSocketCall(unittest.TestCase):
 
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     def test_websocket_success_flow(self, mock_tts_stream, mock_llm, mock_stt):
         # Configure mocks
         mock_stt.return_value = "Hello receptionist"
-        mock_llm.return_value = "Hello! How can I assist you?"
+        
+        async def mock_llm_stream(*args, **kwargs):
+            yield "Hello how can I assist you"
+        mock_llm.side_effect = mock_llm_stream
         
         async def mock_stream(text, language_code):
             yield b"synthesized-audio-bytes"
@@ -49,16 +68,19 @@ class TestWebSocketCall(unittest.TestCase):
             mock_stt.assert_called_once_with(b"input-audio-bytes", "hi-IN")
             self.assertEqual(mock_llm.call_args[0][0], "Hello receptionist")
             self.assertEqual(mock_llm.call_args[0][1], [])
-            mock_tts_stream.assert_called_once_with("Hello! How can I assist you?", "hi-IN")
+            mock_tts_stream.assert_called_once_with("Hello how can I assist you", "hi-IN")
 
     @patch("app.api.ws_call.get_fallback_audio")
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     def test_websocket_stt_error_handling(self, mock_tts_stream, mock_llm, mock_stt, mock_fallback):
         # Configure mocks: STT fails the first time, succeeds the second time
         mock_stt.side_effect = [RuntimeError("STT translation failed"), "Second attempt succeeded"]
-        mock_llm.return_value = "LLM response"
+        
+        async def mock_llm_stream(*args, **kwargs):
+            yield "LLM response"
+        mock_llm.side_effect = mock_llm_stream
         mock_fallback.return_value = b"fake-stt-fallback-audio"
         
         async def mock_stream(text, language_code):
@@ -86,7 +108,7 @@ class TestWebSocketCall(unittest.TestCase):
 
     @patch("app.api.ws_call.get_fallback_audio")
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     def test_websocket_llm_and_tts_error_handling(self, mock_tts_stream, mock_llm, mock_stt, mock_fallback):
         # Configure mocks:
@@ -94,11 +116,31 @@ class TestWebSocketCall(unittest.TestCase):
         # Turn 2: LLM fails both attempts, triggers LLM fallback
         # Turn 3: LLM succeeds, but TTS fails (closes websocket)
         mock_stt.return_value = "Hello"
-        mock_llm.side_effect = [
-            RuntimeError("Groq failed 1"), "Hi there", # Turn 1
-            RuntimeError("Groq failed 2"), RuntimeError("Groq failed 3"), # Turn 2 (both fail)
-            "Success text" # Turn 3
-        ]
+        
+        async def mock_fail_1(*args, **kwargs):
+            raise RuntimeError("Groq failed 1")
+            yield ""
+        async def mock_success_1(*args, **kwargs):
+            yield "Hi there"
+        async def mock_fail_2(*args, **kwargs):
+            raise RuntimeError("Groq failed 2")
+            yield ""
+        async def mock_fail_3(*args, **kwargs):
+            raise RuntimeError("Groq failed 3")
+            yield ""
+        async def mock_success_2(*args, **kwargs):
+            yield "Success text"
+
+        iterator_calls = iter([
+            mock_fail_1, mock_success_1,
+            mock_fail_2, mock_fail_3,
+            mock_success_2
+        ])
+        async def mock_llm_stream_wrapper(*args, **kwargs):
+            func = next(iterator_calls)
+            async for token in func(*args, **kwargs):
+                yield token
+        mock_llm.side_effect = mock_llm_stream_wrapper
         mock_fallback.return_value = b"fake-llm-fallback-audio"
         
         async def mock_stream(text, language_code):
@@ -143,7 +185,7 @@ class TestWebSocketCall(unittest.TestCase):
 
     @patch("app.api.ws_call.get_fallback_audio")
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     def test_websocket_timeouts_and_status_errors(self, mock_tts_stream, mock_llm, mock_stt, mock_fallback):
         import httpx
@@ -156,12 +198,30 @@ class TestWebSocketCall(unittest.TestCase):
             "Succeeded STT 5"
         ]
         
-        mock_llm.side_effect = [
-            httpx.TimeoutException("LLM timeout"), "LLM retry succeeded", # Turn 3
-            httpx.HTTPStatusError("LLM error 1", request=MagicMock(), response=MagicMock(status_code=500)), # Turn 4
-            httpx.HTTPStatusError("LLM error 2", request=MagicMock(), response=MagicMock(status_code=500)), # Turn 4 retry
-            "LLM normal response" # Turn 5
-        ]
+        async def mock_llm_timeout(*args, **kwargs):
+            raise httpx.TimeoutException("LLM timeout")
+            yield ""
+        async def mock_llm_retry_success(*args, **kwargs):
+            yield "LLM retry succeeded"
+        async def mock_llm_status_error_1(*args, **kwargs):
+            raise httpx.HTTPStatusError("LLM error 1", request=MagicMock(), response=MagicMock(status_code=500))
+            yield ""
+        async def mock_llm_status_error_2(*args, **kwargs):
+            raise httpx.HTTPStatusError("LLM error 2", request=MagicMock(), response=MagicMock(status_code=500))
+            yield ""
+        async def mock_llm_normal(*args, **kwargs):
+            yield "LLM normal response"
+
+        iterator_calls = iter([
+            mock_llm_timeout, mock_llm_retry_success,
+            mock_llm_status_error_1, mock_llm_status_error_2,
+            mock_llm_normal
+        ])
+        async def mock_llm_stream_wrapper(*args, **kwargs):
+            func = next(iterator_calls)
+            async for token in func(*args, **kwargs):
+                yield token
+        mock_llm.side_effect = mock_llm_stream_wrapper
         
         async def mock_stream(text, language_code):
             yield b"tts-chunk"
@@ -214,11 +274,22 @@ class TestWebSocketCall(unittest.TestCase):
                 pass
 
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     def test_websocket_history_limit(self, mock_tts_stream, mock_llm, mock_stt):
         mock_stt.side_effect = ["Msg 1", "Msg 2", "Msg 3", "Msg 4"]
-        mock_llm.side_effect = ["Reply 1", "Reply 2", "Reply 3", "Reply 4"]
+        
+        async def r1(*args, **kwargs): yield "Reply 1"
+        async def r2(*args, **kwargs): yield "Reply 2"
+        async def r3(*args, **kwargs): yield "Reply 3"
+        async def r4(*args, **kwargs): yield "Reply 4"
+        
+        iterator_calls = iter([r1, r2, r3, r4])
+        async def mock_llm_stream_wrapper(*args, **kwargs):
+            func = next(iterator_calls)
+            async for token in func(*args, **kwargs):
+                yield token
+        mock_llm.side_effect = mock_llm_stream_wrapper
         
         async def mock_stream(text, language_code):
             yield b"tts"
@@ -268,14 +339,18 @@ class TestWebSocketCall(unittest.TestCase):
 
     @patch("app.api.ws_call.get_supabase")
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     @patch("app.api.ws_call.get_fallback_audio")
     @patch("app.workers.tasks.send_emergency_callback_whatsapp")
     def test_websocket_llm_outage_graceful_exit(self, mock_emergency_task, mock_fallback, mock_tts_stream, mock_llm, mock_stt, mock_get_supabase):
         # Configure mocks
         mock_stt.return_value = "Hello"
-        mock_llm.return_value = None  # Represents LLM failure
+        
+        async def mock_empty_gen(*args, **kwargs):
+            if False:
+                yield ""
+        mock_llm.side_effect = mock_empty_gen
         mock_fallback.return_value = b"fallback-audio"
         
         async def mock_stream(text, language_code):
@@ -320,13 +395,16 @@ class TestWebSocketCall(unittest.TestCase):
 
     @patch("app.api.ws_call.get_supabase")
     @patch("app.api.ws_call.speech_to_text")
-    @patch("app.api.ws_call.get_response")
+    @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
     def test_websocket_concurrency_limit(self, mock_tts_stream, mock_llm, mock_stt, mock_get_supabase):
         from fastapi import WebSocketDisconnect
         # Configure mocks
         mock_stt.return_value = "Hello"
-        mock_llm.return_value = "Hi"
+        
+        async def mock_hi_stream(*args, **kwargs):
+            yield "Hi"
+        mock_llm.side_effect = mock_hi_stream
         
         async def mock_stream(text, language_code):
             yield b"tts"
