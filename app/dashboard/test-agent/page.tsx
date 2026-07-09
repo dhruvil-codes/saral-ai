@@ -171,11 +171,69 @@ function downsampleBuffer(
 export default function TestAgentPage() {
   // ── UI state ──────────────────────────────────────────────────────────────
   const [status, setStatus] = useState<CallStatus>("idle");
-  const [wsUrl, setWsUrl] = useState("ws://localhost:8000/ws/call");
+  const [wsUrl, setWsUrl] = useState("ws://127.0.0.1:8000/ws/call");
   const [language, setLanguage] = useState("en-IN");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [totalBytesSent, setTotalBytesSent] = useState(0);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("saral_selected_device_id") || "";
+    }
+    return "";
+  });
+  const [micBoost, setMicBoost] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("saral_mic_boost") || "auto";
+    }
+    return "auto";
+  });
+  const micBoostRef = useRef<string>("auto");
+  
+  useEffect(() => {
+    micBoostRef.current = micBoost;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("saral_mic_boost", micBoost);
+    }
+  }, [micBoost]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && selectedDeviceId) {
+      localStorage.setItem("saral_selected_device_id", selectedDeviceId);
+    }
+  }, [selectedDeviceId]);
+
+  // Load input devices on mount
+  useEffect(() => {
+    async function initDevices() {
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const inputs = list.filter((d) => d.kind === "audioinput");
+        setDevices(inputs);
+        
+        const savedId = localStorage.getItem("saral_selected_device_id");
+        if (savedId && inputs.some((d) => d.deviceId === savedId)) {
+          setSelectedDeviceId(savedId);
+        } else if (inputs.length > 0 && !selectedDeviceId) {
+          setSelectedDeviceId(inputs[0].deviceId);
+        }
+      } catch (err) {
+        console.error("enumerateDevices failed:", err);
+      }
+    }
+    initDevices();
+  }, [selectedDeviceId]);
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      const inputs = list.filter((d) => d.kind === "audioinput");
+      setDevices(inputs);
+    } catch (err) {
+      console.error("refreshDevices failed:", err);
+    }
+  }, []);
 
   // ── Refs (audio / WS plumbing — no re-render needed) ─────────────────────
   const wsRef = useRef<WebSocket | null>(null);
@@ -193,6 +251,7 @@ export default function TestAgentPage() {
   const mseQueueRef = useRef<ArrayBuffer[]>([]);
   const mseUseRef = useRef<boolean>(false);
   const fallbackBufferRef = useRef<Uint8Array>(new Uint8Array(0));
+  const playedDurationRef = useRef<number>(0);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const isAISpeakingRef = useRef<boolean>(false);
   const firstChunkPlayedRef = useRef<boolean>(false);
@@ -318,12 +377,14 @@ export default function TestAgentPage() {
     mseQueueRef.current = [];
     mseUseRef.current = false;
     fallbackBufferRef.current = new Uint8Array(0);
+    playedDurationRef.current = 0;
 
     // Reset next play cursor
     if (audioCtxRef.current) {
       nextPlayTimeRef.current = audioCtxRef.current.currentTime;
     }
 
+    firstChunkPlayedRef.current = false;
     isAISpeakingRef.current = false;
   }, []);
 
@@ -338,6 +399,7 @@ export default function TestAgentPage() {
     nextPlayTimeRef.current = audioCtx.currentTime;
     firstChunkPlayedRef.current = false;
     fallbackBufferRef.current = new Uint8Array(0);
+    playedDurationRef.current = 0;
 
     if (
       typeof window !== "undefined" &&
@@ -396,6 +458,12 @@ export default function TestAgentPage() {
         mseUseRef.current = false;
       };
 
+      audioEl.onended = () => {
+        isAISpeakingRef.current = false;
+        setStatus("connected");
+        addLog("debug", "MSE Audio element playback ended.");
+      };
+
       audioEl.play().catch(() => {});
     } else {
       mseUseRef.current = false;
@@ -411,13 +479,8 @@ export default function TestAgentPage() {
       const ms = mediaSourceRef.current;
       const sb = sourceBufferRef.current;
 
-      if (
-        mseUseRef.current &&
-        ms &&
-        ms.readyState === "open" &&
-        sb
-      ) {
-        if (!sb.updating && mseQueueRef.current.length === 0) {
+      if (mseUseRef.current && ms) {
+        if (sb && !sb.updating && mseQueueRef.current.length === 0) {
           try {
             sb.appendBuffer(arrayBuffer);
           } catch {
@@ -440,7 +503,7 @@ export default function TestAgentPage() {
       const audioCtx = audioCtxRef.current;
       if (!audioCtx) return;
 
-      // Accumulate
+      // Accumulate the raw MP3 bytes
       const prev = fallbackBufferRef.current;
       const next = new Uint8Array(prev.length + arrayBuffer.byteLength);
       next.set(prev, 0);
@@ -448,45 +511,58 @@ export default function TestAgentPage() {
       fallbackBufferRef.current = next;
 
       try {
+        // Decode the entire accumulated stream
         const promise = audioCtx.decodeAudioData(
           next.buffer.slice(0),
           (decoded) => {
-            fallbackBufferRef.current = new Uint8Array(0);
+            const played = playedDurationRef.current;
+            const totalDuration = decoded.duration;
+            const newDuration = totalDuration - played;
 
-            const startTime = Math.max(
-              audioCtx.currentTime,
-              nextPlayTimeRef.current
-            );
-            const src = audioCtx.createBufferSource();
-            src.buffer = decoded;
-            src.connect(audioCtx.destination);
-            src.start(startTime);
-            activeSourcesRef.current.push(src);
-
-            src.onended = () => {
-              activeSourcesRef.current = activeSourcesRef.current.filter(
-                (s) => s !== src
+            if (newDuration > 0.05) { // Only play if we have at least 50ms of new audio
+              const startTime = Math.max(
+                audioCtx.currentTime,
+                nextPlayTimeRef.current
               );
-            };
+              const src = audioCtx.createBufferSource();
+              src.buffer = decoded;
+              src.connect(audioCtx.destination);
+              
+              // Play only the new portion: start at startTime, with offset = played
+              src.start(startTime, played);
+              activeSourcesRef.current.push(src);
 
-            nextPlayTimeRef.current = startTime + decoded.duration;
+              src.onended = () => {
+                activeSourcesRef.current = activeSourcesRef.current.filter(
+                  (s) => s !== src
+                );
+                if (activeSourcesRef.current.length === 0) {
+                  isAISpeakingRef.current = false;
+                  setStatus("connected");
+                  addLog("debug", "Fallback Audio source playback ended.");
+                }
+              };
 
-            if (
-              !firstChunkPlayedRef.current &&
-              stoppedSpeakingTimeRef.current
-            ) {
-              firstChunkPlayedRef.current = true;
-              const latency =
-                performance.now() - stoppedSpeakingTimeRef.current;
-              setLatencyMs(Math.round(latency));
-              addLog(
-                "debug",
-                `Web Audio fallback playback started. Latency: ${latency.toFixed(0)} ms`
-              );
+              nextPlayTimeRef.current = startTime + newDuration;
+              playedDurationRef.current = totalDuration;
+
+              if (
+                !firstChunkPlayedRef.current &&
+                stoppedSpeakingTimeRef.current
+              ) {
+                firstChunkPlayedRef.current = true;
+                const latency =
+                  performance.now() - stoppedSpeakingTimeRef.current;
+                setLatencyMs(Math.round(latency));
+                addLog(
+                  "debug",
+                  `Web Audio fallback playback started. Latency: ${latency.toFixed(0)} ms`
+                );
+              }
             }
           },
           () => {
-            // Waiting for more frames — this is expected and fine
+            // Waiting for more frames to form a decodable block — expected
           }
         );
 
@@ -519,9 +595,14 @@ export default function TestAgentPage() {
       }, 80);
     }
 
-    isAISpeakingRef.current = false;
-    setStatus("connected");
-  }, []);
+    // Safety release: if audio element is not active/playing, release state immediately.
+    // Otherwise, the audioEl.onended listener will release it when playback finishes.
+    const audioEl = document.getElementById("tts-audio-el") as HTMLAudioElement | null;
+    if (!audioEl || audioEl.paused || audioEl.ended || audioEl.readyState < 2) {
+      isAISpeakingRef.current = false;
+      setStatus("connected");
+    }
+  }, [addLog]);
 
   // ── PCM accumulation buffer across processor callbacks ───────────────────
   const pcmAccumRef = useRef<Int16Array[]>([]);
@@ -530,17 +611,20 @@ export default function TestAgentPage() {
   const startCall = useCallback(async () => {
     addLog("system", `Connecting to ${wsUrl}?language=${language}…`);
     setStatus("connecting");
+    isAISpeakingRef.current = false;
 
     // 1. Request mic
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
+      const constraints: MediaStreamConstraints = {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
         },
-      });
+      };
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addLog("error", `Microphone permission denied: ${msg}`);
@@ -548,6 +632,16 @@ export default function TestAgentPage() {
       return;
     }
     mediaStreamRef.current = stream;
+    refreshDevices();
+
+    // Log mic track metadata for debugging
+    const track = stream.getAudioTracks()[0];
+    console.log("[Mic Track Status]", {
+      enabled: track?.enabled,
+      muted: track?.muted,
+      label: track?.label,
+      readyState: track?.readyState,
+    });
 
     // 2. Create AudioContext
     const audioCtx = new (window.AudioContext ||
@@ -587,6 +681,15 @@ export default function TestAgentPage() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
       const inputData = e.inputBuffer.getChannelData(0);
+      
+      // Calculate raw float32 RMS
+      let rawSum = 0;
+      for (let i = 0; i < inputData.length; i++) {
+        rawSum += inputData[i] * inputData[i];
+      }
+      const rawRms = Math.sqrt(rawSum / inputData.length);
+      console.log(`[Mic Debug Raw] Float32 RMS: ${rawRms.toFixed(6)}`);
+
       const downsampled = downsampleBuffer(
         inputData,
         audioCtx.sampleRate,
@@ -610,21 +713,61 @@ export default function TestAgentPage() {
         pcmAccumRef.current = [];
         totalSamplesAccum = 0;
 
+        // Apply gain booster
+        let appliedGain = 1;
+        const currentBoost = micBoostRef.current;
+        if (currentBoost === "auto") {
+          // Dynamic AGC: Target a peak of 16000 (~50% amplitude)
+          let maxVal = 0;
+          for (let i = 0; i < flat.length; i++) {
+            const absVal = Math.abs(flat[i]);
+            if (absVal > maxVal) maxVal = absVal;
+          }
+          // Only boost if there is a non-zero signal to prevent static amplification
+          if (maxVal >= 1 && maxVal < 16000) {
+            appliedGain = 16000 / maxVal;
+            // Cap gain to 800x
+            appliedGain = Math.min(appliedGain, 800);
+          }
+        } else {
+          appliedGain = parseFloat(currentBoost);
+        }
+
+        if (appliedGain > 1) {
+          for (let i = 0; i < flat.length; i++) {
+            flat[i] = Math.max(-32768, Math.min(32767, Math.round(flat[i] * appliedGain)));
+          }
+          console.log(`[Mic AGC] Boosted quiet audio by ${appliedGain.toFixed(1)}x (original peak: ${Math.round(16000 / appliedGain)})`);
+        }
+
         // Calculate RMS of flat Int16 samples
         let sumSquares = 0;
         for (let i = 0; i < flat.length; i++) {
           sumSquares += flat[i] * flat[i];
         }
         const rms = Math.sqrt(sumSquares / flat.length);
+        console.log(`[Mic Debug Int16] Flat RMS: ${rms.toFixed(1)}, samples: ${flat.length}`);
 
-        // Barge-in: if AI is speaking AND the user is actively speaking (RMS > threshold)
-        const USER_SPEECH_THRESHOLD = 1500;
-        if (isAISpeakingRef.current && rms > USER_SPEECH_THRESHOLD) {
+        // Barge-in: if AI is speaking AND the user is actively speaking.
+        // We set the threshold to 3000 to prevent speaker echo (RMS ~1800) from falsely cutting off the AI,
+        // while allowing the user's boosted speech (RMS ~4000+) to successfully interrupt.
+        const USER_SPEECH_THRESHOLD = 3000;
+        if (isAISpeakingRef.current && firstChunkPlayedRef.current && rms > USER_SPEECH_THRESHOLD) {
           addLog(
             "debug",
             `Barge-in triggered (RMS: ${Math.round(rms)} > ${USER_SPEECH_THRESHOLD}) — stopping AI playback.`
           );
           stopAIAudio();
+          const ws = wsRef.current;
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: "barge_in" }));
+          }
+        }
+
+        // If the AI is still speaking (user did not barge in), discard this chunk and do not send it.
+        // This avoids feedback loop where AI's own voice/echo is sent to the VAD.
+        if (isAISpeakingRef.current) {
+          return;
         }
 
         stoppedSpeakingTimeRef.current = null; // reset; will be set when PCM send happens
@@ -698,12 +841,53 @@ export default function TestAgentPage() {
     ws.onclose = (e) => {
       addLog("system", `WebSocket closed. Code: ${e.code}, reason: ${e.reason || "none"}`);
       setStatus("idle");
+      
+      // Fully release mic and audio resources on connection close
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+      }
+      stopAIAudio();
+      if (audioCtxRef.current) {
+        try {
+          audioCtxRef.current.close();
+        } catch {
+          // ignore
+        }
+        audioCtxRef.current = null;
+      }
       stopVisualizer();
+      analyserRef.current = null;
     };
 
     ws.onerror = () => {
       addLog("error", "WebSocket error. Is the backend running?");
       setStatus("idle");
+      
+      // Fully release mic and audio resources on connection error
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+      }
+      stopAIAudio();
+      if (audioCtxRef.current) {
+        try {
+          audioCtxRef.current.close();
+        } catch {
+          // ignore
+        }
+        audioCtxRef.current = null;
+      }
+      stopVisualizer();
+      analyserRef.current = null;
     };
   }, [
     wsUrl,
@@ -715,6 +899,8 @@ export default function TestAgentPage() {
     finishStreamingPlayback,
     handleTTSChunk,
     stopAIAudio,
+    selectedDeviceId,
+    refreshDevices,
   ]);
 
   // ── End call ──────────────────────────────────────────────────────────────
@@ -763,6 +949,191 @@ export default function TestAgentPage() {
     setStatus("idle");
     addLog("system", "Call ended. All resources released.");
   }, [addLog, stopAIAudio, stopVisualizer]);
+
+  // ── Start test call (WAV file) ─────────────────────────────────────────────
+  const startTestCall = useCallback(async () => {
+    addLog("system", "Starting test call using real_voice.wav…");
+    setStatus("connecting");
+    isAISpeakingRef.current = false;
+
+    // 1. Create AudioContext
+    const audioCtx = new (window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext)();
+    audioCtxRef.current = audioCtx;
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+
+    addLog("debug", `AudioContext created. Native sample rate: ${audioCtx.sampleRate} Hz`);
+
+    // 2. Fetch and decode real_voice.wav
+    let audioBuffer: AudioBuffer;
+    try {
+      addLog("debug", "Fetching /real_voice.wav…");
+      const res = await fetch("/real_voice.wav");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const arrayBuffer = await res.arrayBuffer();
+      addLog("debug", "Decoding /real_voice.wav…");
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      addLog("debug", `Decoded audio: ${audioBuffer.duration.toFixed(2)}s, sampleRate=${audioBuffer.sampleRate}Hz`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Failed to load test audio: ${msg}`);
+      setStatus("idle");
+      await audioCtx.close();
+      return;
+    }
+
+    // 3. Connect buffer source -> analyser (for visualizer)
+    const sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyserRef.current = analyser;
+    sourceNode.connect(analyser);
+
+    // 4. ScriptProcessorNode for PCM capture + downsampling
+    const processor = audioCtx.createScriptProcessor(
+      PROCESSOR_BUFFER_SIZE,
+      1,
+      1
+    );
+    processorRef.current = processor;
+    analyser.connect(processor);
+    processor.connect(audioCtx.destination);
+
+    // 5. Open WebSocket
+    const fullUrl = `${wsUrl}?language=${language}`;
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(fullUrl);
+      ws.binaryType = "arraybuffer";
+      wsRef.current = ws;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Failed to create WebSocket: ${msg}`);
+      setStatus("idle");
+      await audioCtx.close();
+      return;
+    }
+
+    // Set up PCM sending (reused from onaudioprocess)
+    pcmAccumRef.current = [];
+    let totalSamplesAccum = 0;
+    const SEND_INTERVAL_SAMPLES = TARGET_SAMPLE_RATE * 0.25;
+
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      const currentWs = wsRef.current;
+      if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return;
+
+      const inputData = e.inputBuffer.getChannelData(0);
+      const downsampled = downsampleBuffer(
+        inputData,
+        audioCtx.sampleRate,
+        TARGET_SAMPLE_RATE
+      );
+      pcmAccumRef.current.push(downsampled);
+      totalSamplesAccum += downsampled.length;
+
+      if (totalSamplesAccum >= SEND_INTERVAL_SAMPLES) {
+        const totalLen = pcmAccumRef.current.reduce((acc, c) => acc + c.length, 0);
+        const flat = new Int16Array(totalLen);
+        let offset = 0;
+        for (const chunk of pcmAccumRef.current) {
+          flat.set(chunk, offset);
+          offset += chunk.length;
+        }
+        pcmAccumRef.current = [];
+        totalSamplesAccum = 0;
+
+        const pcmBuffer = flat.buffer;
+        currentWs.send(pcmBuffer);
+        
+        setTotalBytesSent((prev) => prev + pcmBuffer.byteLength);
+      }
+    };
+
+    ws.onopen = () => {
+      addLog("system", "WebSocket connection opened. Playing test WAV…");
+      setStatus("listening");
+      drawVisualizer();
+      
+      // Start playback of the test WAV
+      sourceNode.start(0);
+      addLog("debug", "Playback started. Streaming audio…");
+      
+      sourceNode.onended = () => {
+        addLog("debug", "Test WAV playback ended. Streaming silence to trigger VAD…");
+      };
+    };
+
+    ws.onmessage = async (event: MessageEvent) => {
+      if (typeof event.data === "string") {
+        try {
+          const data = JSON.parse(event.data) as Record<string, unknown>;
+          if (data.status === "transcribed") {
+            const text = String(data.text ?? "");
+            addLog("user", text);
+            stoppedSpeakingTimeRef.current = performance.now();
+            addLog("debug", "Utterance transmitted. Awaiting AI response…");
+          } else if (data.status === "tts_start") {
+            isAISpeakingRef.current = true;
+            setStatus("ai_speaking");
+            addLog("ai", "TTS stream starting…");
+            await initStreamingPlayback();
+          } else if (data.status === "tts_end") {
+            addLog("ai", "TTS stream complete.");
+            finishStreamingPlayback();
+          } else if (data.cache_hit) {
+            addLog("debug", "Semantic cache HIT — serving cached response.");
+          } else if (data.error) {
+            addLog("error", `Server error: ${String(data.error)}`);
+          }
+        } catch {
+          addLog("debug", `Raw text message: ${event.data}`);
+        }
+      } else if (event.data instanceof ArrayBuffer) {
+        handleTTSChunk(event.data);
+      }
+    };
+
+    ws.onclose = (e) => {
+      addLog("system", `WebSocket closed. Code: ${e.code}, reason: ${e.reason || "none"}`);
+      setStatus("idle");
+      try {
+        sourceNode.stop();
+      } catch {}
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+      }
+      stopAIAudio();
+      if (audioCtxRef.current) {
+        try {
+          audioCtxRef.current.close();
+        } catch {}
+        audioCtxRef.current = null;
+      }
+      stopVisualizer();
+      analyserRef.current = null;
+    };
+
+    ws.onerror = () => {
+      addLog("error", "WebSocket error.");
+      setStatus("idle");
+    };
+
+  }, [
+    wsUrl,
+    language,
+    addLog,
+    drawVisualizer,
+    stopVisualizer,
+    initStreamingPlayback,
+    finishStreamingPlayback,
+    handleTTSChunk,
+    stopAIAudio,
+  ]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -837,43 +1208,97 @@ export default function TestAgentPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-5 pb-5">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="ws-url"
-                className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
-              >
-                WebSocket URL
-              </Label>
-              <Input
-                id="ws-url"
-                value={wsUrl}
-                onChange={(e) => setWsUrl(e.target.value)}
-                disabled={isCallActive || status === "connecting"}
-                className="font-mono text-sm h-9 rounded-lg border-border/70 bg-background"
-                placeholder="ws://localhost:8000/ws/call"
-              />
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="ws-url"
+                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
+                >
+                  WebSocket URL
+                </Label>
+                <Input
+                  id="ws-url"
+                  value={wsUrl}
+                  onChange={(e) => setWsUrl(e.target.value)}
+                  disabled={isCallActive || status === "connecting"}
+                  className="font-mono text-sm h-9 rounded-lg border-border/70 bg-background"
+                  placeholder="ws://localhost:8000/ws/call"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="ws-lang"
+                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
+                >
+                  Language
+                </Label>
+                <select
+                  id="ws-lang"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  disabled={isCallActive || status === "connecting"}
+                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {LANGUAGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="ws-lang"
-                className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
-              >
-                Language
-              </Label>
-              <select
-                id="ws-lang"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                disabled={isCallActive || status === "connecting"}
-                className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {LANGUAGE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="ws-mic"
+                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
+                >
+                  Microphone Input Device
+                </Label>
+                <select
+                  id="ws-mic"
+                  value={selectedDeviceId}
+                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  onFocus={refreshDevices}
+                  disabled={isCallActive || status === "connecting"}
+                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {devices.length === 0 ? (
+                    <option value="">Default System Microphone</option>
+                  ) : (
+                    devices.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Microphone ${device.deviceId.slice(0, 5)}...`}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="ws-mic-boost"
+                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
+                >
+                  Microphone Boost
+                </Label>
+                <select
+                  id="ws-mic-boost"
+                  value={micBoost}
+                  onChange={(e) => setMicBoost(e.target.value)}
+                  disabled={isCallActive || status === "connecting"}
+                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="auto">Auto-Boost (Recommended)</option>
+                  <option value="1">1x (No Boost)</option>
+                  <option value="10">10x Boost</option>
+                  <option value="100">100x Boost</option>
+                  <option value="500">500x Boost</option>
+                  <option value="1000">1000x Boost</option>
+                </select>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -948,14 +1373,25 @@ export default function TestAgentPage() {
 
           {/* CTA Button */}
           {!isCallActive && status !== "connecting" ? (
-            <Button
-              id="btn-start-call"
-              onClick={startCall}
-              className="w-full rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-sans font-semibold text-sm h-11 gap-2.5 shadow-none transition-colors"
-            >
-              <Mic className="size-4" />
-              Start Call
-            </Button>
+            <div className="flex flex-col gap-2 w-full">
+              <Button
+                id="btn-start-call"
+                onClick={startCall}
+                className="w-full rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-sans font-semibold text-sm h-11 gap-2.5 shadow-none transition-colors"
+              >
+                <Mic className="size-4" />
+                Start Call (Mic)
+              </Button>
+              <Button
+                id="btn-start-test-call"
+                onClick={startTestCall}
+                variant="outline"
+                className="w-full rounded-full border-border/70 text-foreground hover:bg-[#f5f5f0] font-sans font-semibold text-sm h-11 gap-2.5 shadow-none transition-colors"
+              >
+                <Mic className="size-4" />
+                Start Test Call (WAV File)
+              </Button>
+            </div>
           ) : status === "connecting" ? (
             <Button
               disabled
