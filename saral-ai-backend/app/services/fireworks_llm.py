@@ -17,6 +17,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 import httpx
 from app.api.bookings import hold_booking_slot, confirm_booking_slot
+from fastapi.concurrency import run_in_threadpool
 
 # Load environment variables from .env if present
 load_dotenv()
@@ -331,7 +332,10 @@ def get_response(
     # Build / inject system prompt (identical logic to groq_llm.py)
     # ------------------------------------------------------------------
     default_sys = (
-        "You are a helpful receptionist AI assistant for Saral AI. "
+        "You are Shruti, a helpful female receptionist AI assistant for Saral AI. "
+        "Because you are a female and your voice is female (Shruti), you must always refer to yourself "
+        "in the female grammatical gender (e.g. use 'कर सकती हूँ', 'करूँगी', 'व्यस्त हूँ', etc. instead "
+        "of male verbs/pronouns). "
         "If the caller wants to book or reserve an appointment, you must first call the "
         "hold_appointment_slot tool to check and temporarily hold the slot. "
         "After calling hold_appointment_slot, you MUST explicitly read back the critical "
@@ -580,7 +584,15 @@ async def _fireworks_chat_stream_async(
     last_exc: Exception = RuntimeError("No attempts made")
     for attempt in range(1, _max_retries + 1):
         try:
+            t_client_start = time.perf_counter()
             async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+                t_client_end = time.perf_counter()
+                logger.info(
+                    "[fireworks_llm] [TIMING] AsyncClient instantiation took: %.3f ms", 
+                    (t_client_end - t_client_start) * 1000
+                )
+                
+                t_post_start = time.perf_counter()
                 async with client.stream(
                     "POST",
                     f"{FIREWORKS_API_BASE}/chat/completions",
@@ -591,6 +603,12 @@ async def _fireworks_chat_stream_async(
                     },
                     json=payload,
                 ) as response:
+                    t_post_end = time.perf_counter()
+                    logger.info(
+                        "[fireworks_llm] [TIMING] client.stream POST connection + header response took: %.3f ms", 
+                        (t_post_end - t_post_start) * 1000
+                    )
+                    
                     response.raise_for_status()
                     
                     tool_calls_builder = {}
@@ -618,7 +636,11 @@ async def _fireworks_chat_stream_async(
                                 
                                 content = delta.get("content")
                                 if content:
-                                    yield {"type": "content", "content": content}
+                                    try:
+                                        yield {"type": "content", "content": content}
+                                    except GeneratorExit:
+                                        logger.info("[fireworks_llm] GeneratorExit caught at content yield. Exiting stream cleanly.")
+                                        return
                                     
                                 tool_calls = delta.get("tool_calls")
                                 if tool_calls:
@@ -653,7 +675,11 @@ async def _fireworks_chat_stream_async(
                     if tool_calls_builder:
                         for idx in sorted(tool_calls_builder.keys()):
                             reconstructed_tool_calls.append(tool_calls_builder[idx])
-                        yield {"type": "tool_calls", "tool_calls": reconstructed_tool_calls}
+                        try:
+                            yield {"type": "tool_calls", "tool_calls": reconstructed_tool_calls}
+                        except GeneratorExit:
+                            logger.info("[fireworks_llm] GeneratorExit caught at tool_calls yield. Exiting stream cleanly.")
+                            return
                             
                     total_dur = time.perf_counter() - t0
                     logger.info("[fireworks_llm] Async Stream finished. TTFT: %s, Total: %.3fs", 
@@ -662,7 +688,11 @@ async def _fireworks_chat_stream_async(
         except httpx.TimeoutException:
             raise
         except httpx.HTTPStatusError as hse:
-            body = hse.response.text
+            try:
+                await hse.response.aread()
+                body = hse.response.text
+            except Exception:
+                body = ""
             is_empty_output_error = (
                 hse.response.status_code in (500, 400)
                 and "model output must contain either output text" in body
@@ -717,7 +747,10 @@ async def get_response_stream_async(
             messages.append({"role": role, "content": str(msg["content"])})
 
     default_sys = (
-        "You are a helpful receptionist AI assistant for Saral AI. "
+        "You are Shruti, a helpful female receptionist AI assistant for Saral AI. "
+        "Because you are a female and your voice is female (Shruti), you must always refer to yourself "
+        "in the female grammatical gender (e.g. use 'कर सकती हूँ', 'करूँगी', 'व्यस्त हूँ', etc. instead "
+        "of male verbs/pronouns). "
         "If the caller wants to book or reserve an appointment, you must first call the "
         "hold_appointment_slot tool to check and temporarily hold the slot. "
         "After calling hold_appointment_slot, you MUST explicitly read back the critical "
@@ -767,6 +800,14 @@ async def get_response_stream_async(
     )
     if "[STRICT DATETIME RESOLUTION RULE]" not in sys_content:
         sys_content += strict_datetime_instructions
+
+    short_response_instruction = (
+        "\n\n[STRICT BREVITY CONSTRAINT]:\n"
+        "You must keep your replies extremely short, concise, and direct (maximum 1 or 2 short sentences). "
+        "For list items or explanations, output in one-line answers only. "
+        "Do NOT speak long paragraphs, and do NOT spam the user with excessive text. Keep it brief and conversational."
+    )
+    sys_content += short_response_instruction
 
     system_index = -1
     for i, m in enumerate(messages):
@@ -829,12 +870,17 @@ async def get_response_stream_async(
                             ),
                         }
                     else:
-                        db_result = hold_booking_slot(
-                            user_id=user_id, slot_datetime=slot_dt, call_id=call_id
+                        db_result = await run_in_threadpool(
+                            hold_booking_slot,
+                            user_id=user_id,
+                            slot_datetime=slot_dt,
+                            call_id=call_id
                         )
                 else:
-                    db_result = confirm_booking_slot(
-                        user_id=user_id, slot_datetime=slot_dt
+                    db_result = await run_in_threadpool(
+                        confirm_booking_slot,
+                        user_id=user_id,
+                        slot_datetime=slot_dt
                     )
             else:
                 db_result = {
