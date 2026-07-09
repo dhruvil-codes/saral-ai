@@ -6,6 +6,20 @@ Directly connects to local FastAPI WebSocket to simulate user conversations and 
 
 import os
 import sys
+# Override print for Windows console encoding compatibility
+_orig_print = print
+def print(*args, **kwargs):
+    try:
+        _orig_print(*args, **kwargs)
+    except UnicodeEncodeError:
+        new_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                new_args.append(arg.encode(sys.stdout.encoding or 'cp1252', errors='replace').decode(sys.stdout.encoding or 'cp1252'))
+            else:
+                new_args.append(arg)
+        _orig_print(*new_args, **kwargs)
+
 import time
 import json
 import asyncio
@@ -145,7 +159,7 @@ async def trigger_incoming_call(server_url: str, user_id: str, caller_number: st
         raise RuntimeError(f"WebSocket URL not found in TwiML: {twiml}")
         
     ws_url = match.group(1)
-    if "localhost" in ws_url and ws_url.startswith("wss://"):
+    if ("localhost" in ws_url or "127.0.0.1" in ws_url) and ws_url.startswith("wss://"):
         ws_url = ws_url.replace("wss://", "ws://")
         
     return {"ws_url": ws_url, "call_id": call_sid}
@@ -342,9 +356,9 @@ async def test_hinglish_vad(server_url: str):
             transcript = result.get("transcript", "")
             print(f"\nFinal Transcript returned: '{transcript}'")
             
-            # Verify transcript has the components from both sentences
-            has_part1 = any(w in transcript.lower() for w in ["appointment", "appointment tha", "mera"])
-            has_part2 = any(w in transcript.lower() for w in ["kal", "subah", "10", "baje"])
+            # Verify transcript has the components from both sentences (supports English and Devanagari)
+            has_part1 = any(w in transcript.lower() for w in ["appointment", "appointment tha", "mera", "अपॉइंटमेंट", "अपोइंटमेंट", "मेरा"])
+            has_part2 = any(w in transcript.lower() for w in ["kal", "subah", "10", "baje", "कल", "सुबह", "बजे"])
             
             if has_part1 and has_part2:
                 print("✅ Hinglish VAD Test PASSED: Combined speech transcribed correctly without early cut-off!")
