@@ -30,6 +30,15 @@ async def lifespan(app: FastAPI):
         await run_in_threadpool(semantic_cache.load_from_redis)
     except Exception as e:
         logger.warning(f"Failed to load semantic cache from Redis on startup: {e}")
+
+    logger.info("Lifespan startup: preloading embedding model (all-MiniLM-L6-v2)...")
+    try:
+        from app.services.intent_cache import preload_embedding_model, get_and_reset_model_load_time_ms
+        await run_in_threadpool(preload_embedding_model)
+        # Flush the startup loading time so it isn't counted in the first WS call telemetry
+        await run_in_threadpool(get_and_reset_model_load_time_ms)
+    except Exception as e:
+        logger.warning(f"Failed to preload embedding model on startup: {e}")
         
     logger.info("Lifespan startup: starting FAQ scheduler loop...")
     faq_task = asyncio.create_task(faq_scheduler_loop())
