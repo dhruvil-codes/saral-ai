@@ -16,12 +16,14 @@ class TestHinglishAndVAD(unittest.TestCase):
 
     def setUp(self):
         # Initialize detector with default threshold of 1000ms (configured in Step 2)
+        # force_rms=True: bypass webrtcvad for artificial test frames
         self.detector = VoiceActivityDetector(
             sample_rate=16000,
             sample_width=2,
             channels=1,
             rms_threshold=500.0,
-            silence_threshold_ms=1000
+            silence_threshold_ms=1000,
+            force_rms=True
         )
 
     def _generate_pcm_frame(self, amplitude: int, duration_ms: int = 20) -> bytes:

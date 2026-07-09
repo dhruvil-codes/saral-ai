@@ -7,6 +7,7 @@ import logging
 from typing import List
 from app.db.supabase_client import get_supabase
 from app.core.config import settings
+from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +41,17 @@ async def get_relevant_faqs(query_embedding: list, user_id: str, top_n: int = No
         # )
         # returns table(id uuid, user_id uuid, question text, answer text, similarity float, last_updated timestamp with time zone, needs_verification boolean) ...
         #
-        resp = supabase.rpc(
-            "match_faqs",
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": threshold,
-                "match_count": top_n,
-                "filter_user_id": user_id,
-            },
-        ).execute()
+        def _match():
+            return supabase.rpc(
+                "match_faqs",
+                {
+                    "query_embedding": query_embedding,
+                    "match_threshold": threshold,
+                    "match_count": top_n,
+                    "filter_user_id": user_id,
+                },
+            ).execute()
+        resp = await run_in_threadpool(_match)
 
         # Supabase returns data as a list of dicts
         rows = getattr(resp, "data", None) or []

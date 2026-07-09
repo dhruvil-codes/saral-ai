@@ -6,12 +6,14 @@ class TestVoiceActivityDetector(unittest.TestCase):
 
     def setUp(self):
         # 16kHz mono 16-bit PCM VAD
+        # force_rms=True: bypass webrtcvad for artificial test frames
         self.detector = VoiceActivityDetector(
             sample_rate=16000,
             sample_width=2,
             channels=1,
             rms_threshold=500.0,
-            silence_threshold_ms=600
+            silence_threshold_ms=600,
+            force_rms=True
         )
 
     def _generate_pcm_frame(self, amplitude: int, duration_ms: int = 20) -> bytes:

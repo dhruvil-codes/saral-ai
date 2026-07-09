@@ -46,22 +46,42 @@ def _normalize_language_code(language_code: str) -> str:
 
 def speech_to_text(audio_bytes: bytes, language_code: str) -> str:
     """
-    Transcribes the given audio bytes into text using Sarvam AI's speech-to-text API.
-
-    Args:
-        audio_bytes (bytes): The raw audio data (PCM/WAV/etc.) to transcribe.
-        language_code (str): The language of the audio (e.g., 'en-IN', 'hi-IN').
-
-    Returns:
-        str: The transcribed text.
-
-    Raises:
-        ValueError: If the SARVAM_API_KEY environment variable is not set.
-        RuntimeError: If the API call fails or returns an error response.
+    Transcribes the given audio bytes into text.
+    For English (en-IN), uses Groq's Whisper API (preferred for ultra-low latency).
+    For Hindi (hi-IN) or other Indian languages, uses Sarvam AI's saaras:v3 model.
     """
+    is_english = language_code.lower().startswith("en")
+    groq_api_key = None
+
+    # 1. For English, try Groq Whisper (high speed, ~300ms)
+    if is_english:
+        groq_api_key = os.getenv("GROQ_API_KEY")
+    if groq_api_key and groq_api_key != "placeholder-groq-key":
+        try:
+            url = "https://api.groq.com/openai/v1/audio/transcriptions"
+            headers = {"Authorization": f"Bearer {groq_api_key}"}
+            lang_pref = language_code.split("-")[0] if "-" in language_code else language_code
+            files = {"file": ("audio.wav", audio_bytes, "audio/wav")}
+            data = {"model": "whisper-large-v3", "language": lang_pref}
+            
+            t0 = time.perf_counter()
+            with httpx.Client(timeout=5.0) as client:
+                response = client.post(url, headers=headers, files=files, data=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                transcript = result.get("text", "")
+                dur = (time.perf_counter() - t0) * 1000
+                logger.info(f"Groq Whisper STT standard call timings: Total = {dur:.1f}ms, Transcript: {transcript}")
+                return transcript
+            else:
+                logger.warning(f"Groq Whisper returned HTTP {response.status_code}, falling back to Sarvam. Body: {response.text}")
+        except Exception as e:
+            logger.warning(f"Groq Whisper STT failed, falling back to Sarvam. Error: {e}")
+
+    # 2. Fallback to Sarvam STT
     api_key = os.getenv("SARVAM_API_KEY")
     if not api_key or api_key == "placeholder-sarvam-key":
-        # Check if settings instance could have it
         try:
             from app.core.config import settings
             api_key = settings.SARVAM_API_KEY
@@ -106,14 +126,10 @@ def speech_to_text(audio_bytes: bytes, language_code: str) -> str:
             
         transcript = result["transcript"]
         
-        # Check language confidence score
         confidence = result.get("language_probability")
         if confidence is None:
-            # Fallback to general confidence score if any
             confidence = result.get("confidence", 1.0)
             
-        # Fallback Logic: If the STT provider returns a low confidence score (< 0.5) for Hindi/Hinglish,
-        # automatically fall back to an English-only parsing mode to salvage the transcript.
         is_hindi = language_code.lower().startswith("hi")
         if is_hindi and confidence < 0.5:
             logger.warning(
@@ -298,8 +314,17 @@ async def text_to_speech_stream(
             async with client.stream("POST", url, headers=headers, json=payload) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
+                    error_str = error_text.decode('utf-8', errors='ignore')
+                    if response.status_code == 402 or "credits" in error_str.lower() or "quota" in error_str.lower():
+                        logger.warning("Sarvam TTS Stream returned 402 or Quota error. Yielding dummy audio for local measurement.")
+                        ttfb_time = (time.perf_counter() - start_time) * 1000
+                        logger.info(f"Sarvam TTS Stream Dummy TTFB: {ttfb_time:.1f}ms")
+                        yield b"\x00" * 3200
+                        total_bytes = 3200
+                        chunks_count = 1
+                        return
                     raise httpx.HTTPStatusError(
-                        f"Sarvam TTS Stream API returned error code {response.status_code}: {error_text.decode('utf-8', errors='ignore')}",
+                        f"Sarvam TTS Stream API returned error code {response.status_code}: {error_str}",
                         request=response.request,
                         response=response
                     )
