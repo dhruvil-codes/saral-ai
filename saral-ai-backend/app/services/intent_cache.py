@@ -21,11 +21,13 @@ logger = logging.getLogger(__name__)
 # Lazy-loaded local embedding model
 # ---------------------------------------------------------------------------
 _embedding_model = None
+_model_load_time_ms = 0.0
 
 
 def _load_model():
-    global _embedding_model
+    global _embedding_model, _model_load_time_ms
     if _embedding_model is None:
+        t_start = time.perf_counter()
         try:
             from sentence_transformers import SentenceTransformer
             _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -36,7 +38,43 @@ def _load_model():
         except Exception as exc:
             logger.error(f"Failed to load embedding model: {exc}")
             _embedding_model = False
+        _model_load_time_ms = (time.perf_counter() - t_start) * 1000
     return _embedding_model
+
+
+def get_and_reset_model_load_time_ms() -> float:
+    """
+    Returns the time spent loading the SentenceTransformer model in milliseconds
+    since the last check, and resets the counter to 0.0.
+    """
+    global _model_load_time_ms
+    val = _model_load_time_ms
+    _model_load_time_ms = 0.0
+    return val
+
+
+def preload_embedding_model() -> bool:
+    """
+    Eagerly loads the SentenceTransformer embedding model into the process.
+
+    Intended to be called once during FastAPI lifespan startup via
+    ``run_in_threadpool`` so that the model is resident in memory before
+    the first WebSocket call arrives.  Calling this prevents the 15-17 s
+    cold-start penalty that would otherwise block the STT-to-LLM handoff
+    on the very first live call.
+
+    Returns:
+        True if the model loaded successfully, False if unavailable.
+    """
+    model = _load_model()
+    if model is False:
+        logger.warning(
+            "Lifespan startup: embedding model unavailable — "
+            "semantic cache will be disabled for this session."
+        )
+        return False
+    logger.info("Lifespan startup: embedding model pre-loaded and ready.")
+    return True
 
 
 def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -156,7 +194,7 @@ class SemanticCache:
         logger.debug(f"Semantic cache MISS (best_score={best_score:.3f})")
         return False, None
 
-    def add(self, text: str, response: str, language: str, embedding: np.ndarray, audio_bytes: Optional[bytes] = None):
+    async def add(self, text: str, response: str, language: str, embedding: np.ndarray, audio_bytes: Optional[bytes] = None):
         """
         Store a new intent / response / audio in the cache.
         Evicts oldest if max_entries exceeded.
@@ -178,7 +216,7 @@ class SemanticCache:
         if len(self._entries) > self.max_entries:
             self._entries = self._entries[-self.max_entries:]
 
-        self.save_to_redis()
+        await run_in_threadpool(self.save_to_redis)
 
     async def lookup(self, text: str, language: str = "en-IN"):
         """
