@@ -23,6 +23,7 @@ from app.services.whatsapp import send_post_call_summary
 from app.core.config import settings
 
 import re
+import unicodedata
 from datetime import timedelta
 
 # Configure logger
@@ -33,6 +34,11 @@ logger = logging.getLogger(__name__)
 # collection before the task completes (especially during object teardown like
 # a WebSocket closing). Tasks remove themselves via a done-callback.
 BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _has_speakable_alnum(text: str) -> bool:
+    """True when text contains at least one Unicode letter or number."""
+    return any(unicodedata.category(char)[0] in {"L", "N"} for char in text)
 
 
 def _schedule_background_task(coro) -> asyncio.Task:
@@ -170,6 +176,22 @@ async def run_stage2_triage_background(call_id: str, user_id: str, caller_number
             return supabase.table("leads").insert(lead_data).execute()
         await run_in_threadpool(_insert_lead)
         logger.info(f"Successfully stored Stage 2 triage result in 'leads' table for call_id={call_id}.")
+
+        # Fetch clinic owner's whatsapp_number to send Stage 2 case card
+        try:
+            def _get_user_whatsapp():
+                return supabase.table("users").select("whatsapp_number").eq("id", user_id).execute()
+            user_res = await run_in_threadpool(_get_user_whatsapp)
+            if user_res.data and user_res.data[0].get("whatsapp_number"):
+                whatsapp_number = user_res.data[0]["whatsapp_number"]
+                logger.info(f"Sending Stage 2 case card to owner {whatsapp_number} for call_id={call_id}")
+                from app.services.whatsapp import send_case_card
+                await send_case_card(whatsapp_number, triage_data)
+            else:
+                logger.warning(f"No whatsapp_number configured for owner user_id={user_id}. Stage 2 case card notification skipped.")
+        except Exception as wa_err:
+            logger.error(f"Failed to send Stage 2 WhatsApp case card for call_id={call_id}: {wa_err}", exc_info=True)
+
 
     except asyncio.CancelledError:
         # Log explicit cancellation so it's visible in logs (not silently dropped)
@@ -401,6 +423,30 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         actual_speech_duration_ms = int(round((stt_trigger_time - turn_start_time) * 1000)) - silence_wait_ms
 
                     buffering_overhead_ms = int(round((stt_trigger_time - turn_start_time) * 1000))
+
+                    t_first_chunk = turn_start_time
+                    t_speech_start = speech_start_time if speech_start_time is not None else turn_start_time
+                    t_speech_end = stt_trigger_time - (silence_wait_ms / 1000.0)
+                    t_vad_fired = stt_trigger_time
+
+                    sub_a_ms = int(round((t_speech_start - t_first_chunk) * 1000.0))
+                    sub_b_ms = int(round((t_speech_end - t_speech_start) * 1000.0))
+                    sub_c_ms = int(round((t_vad_fired - t_speech_end) * 1000.0))
+
+                    logger.info(
+                        f"[VAD_DIAGNOSTICS] buffering_overhead_ms={buffering_overhead_ms} | "
+                        f"(a) first_chunk_to_speech_start_ms={sub_a_ms} | "
+                        f"(b) speech_start_to_speech_end_ms={sub_b_ms} | "
+                        f"(c) silence_gate_wait_ms={sub_c_ms}"
+                    )
+                    print(
+                        f"\n[VAD_DIAGNOSTICS] buffering_overhead_ms={buffering_overhead_ms} | "
+                        f"(a) first_chunk_to_speech_start_ms={sub_a_ms} | "
+                        f"(b) speech_start_to_speech_end_ms={sub_b_ms} | "
+                        f"(c) silence_gate_wait_ms={sub_c_ms}\n",
+                        flush=True
+                    )
+
                     vad_detector.reset()
                     turn_start_time = None
                     speech_start_time = None
@@ -704,17 +750,26 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                         split_idx = idx
                                         break
                             if split_idx != -1:
-                                sentence = buffer[:split_idx+1].strip()
-                                buffer = buffer[split_idx+1:]
-                                if sentence and any(c.isalnum() for c in sentence):
+                                # Check if the remaining part of the buffer has any alphanumeric characters.
+                                # If it does not, merge it into the current sentence.
+                                remaining = buffer[split_idx+1:]
+                                if not _has_speakable_alnum(remaining):
+                                    sentence = buffer.strip()
+                                    buffer = ""
+                                else:
+                                    sentence = buffer[:split_idx+1].strip()
+                                    buffer = remaining
+                                
+                                if sentence and _has_speakable_alnum(sentence):
                                     yield sentence
                             else:
                                 break
-                    if buffer.strip() and any(c.isalnum() for c in buffer):
+                    if buffer.strip() and _has_speakable_alnum(buffer):
                         yield buffer.strip()
 
                 async def run_concurrent_llm_tts_pipeline(chunk_gen):
                     tts_queue_queue = asyncio.Queue()
+                    tts_tasks = set()
                     turn_failed_event = asyncio.Event()
 
                     async def fetch_tts_to_queue(sentence_idx, sentence_str, queue):
@@ -722,17 +777,33 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         synthesis_start_iso = datetime.now(timezone.utc).isoformat()
                         sentence_telemetry[sentence_idx - 1]["tts_synthesis_start_iso"] = synthesis_start_iso
                         sentence_telemetry[sentence_idx - 1]["tts_synthesis_start_offset_ms"] = int(round((synthesis_start - llm_start) * 1000))
+                        assembled_offset = sentence_telemetry[sentence_idx - 1].get("assembled_offset_ms")
+                        dispatch_delay_ms = None if assembled_offset is None else sentence_telemetry[sentence_idx - 1]["tts_synthesis_start_offset_ms"] - assembled_offset
+                        sentence_telemetry[sentence_idx - 1]["tts_dispatch_delay_ms"] = dispatch_delay_ms
                         logger.info(
                             f"[{turn_id}] [TELEMETRY] sentence_{sentence_idx}_tts_dispatched "
                             f"offset_ms={sentence_telemetry[sentence_idx - 1]['tts_synthesis_start_offset_ms']} "
+                            f"dispatch_delay_ms={dispatch_delay_ms} "
                             f"at={synthesis_start_iso} text={sentence_str!r}"
                         )
+                        if sentence_idx == 1:
+                            logger.info(
+                                f"[{turn_id}] [EXPLICIT_TIMING] Sentence 1 TTS request dispatched "
+                                f"offset_ms={sentence_telemetry[sentence_idx - 1]['tts_synthesis_start_offset_ms']} "
+                                f"dispatch_delay_ms={dispatch_delay_ms} "
+                                f"at={synthesis_start_iso} text={sentence_str!r}"
+                            )
                         logger.info(
                             f"[{turn_id}] [TELEMETRY] sentence_{sentence_idx}_tts_synthesis_start "
                             f"offset_ms={sentence_telemetry[sentence_idx - 1]['tts_synthesis_start_offset_ms']} "
+                            f"dispatch_delay_ms={dispatch_delay_ms} "
                             f"at={synthesis_start_iso} text={sentence_str!r}"
                         )
                         try:
+                            if not _has_speakable_alnum(sentence_str):
+                                logger.warning(f"[{turn_id}] Skipping non-speakable TTS chunk for sentence {sentence_idx}: {sentence_str!r}")
+                                await queue.put(None)
+                                return
                             async for chunk in text_to_speech_stream(sentence_str, language):
                                 if interrupt_event.is_set() or turn_failed_event.is_set():
                                     break
@@ -756,7 +827,10 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                 sentence_telemetry.append({
                                     "sentence_index": sentence_idx,
                                     "text": sentence,
+                                    "assembled_iso": datetime.now(timezone.utc).isoformat(),
+                                    "assembled_offset_ms": int(round((kickoff_at - llm_start) * 1000)),
                                     "tts_kickoff_offset_ms": int(round((kickoff_at - llm_start) * 1000)),
+                                    "tts_dispatch_delay_ms": None,
                                     "tts_synthesis_start_iso": None,
                                     "tts_synthesis_start_offset_ms": None,
                                     "first_audio_sent_iso": None,
@@ -766,11 +840,20 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                 })
                                 logger.info(
                                     f"[{turn_id}] [TELEMETRY] sentence_{sentence_idx}_assembled "
-                                    f"offset_ms={int(round((kickoff_at - llm_start) * 1000))}"
+                                    f"offset_ms={int(round((kickoff_at - llm_start) * 1000))} "
+                                    f"at={sentence_telemetry[-1]['assembled_iso']} text={sentence!r}"
                                 )
+                                if sentence_idx == 1:
+                                    logger.info(
+                                        f"[{turn_id}] [EXPLICIT_TIMING] Sentence 1 fully assembled "
+                                        f"offset_ms={int(round((kickoff_at - llm_start) * 1000))} "
+                                        f"at={sentence_telemetry[-1]['assembled_iso']} text={sentence!r}"
+                                    )
                                 logger.info(f"Kicking off TTS synthesis for sentence {sentence_idx}: {sentence}")
                                 sentence_queue = asyncio.Queue()
-                                asyncio.create_task(fetch_tts_to_queue(sentence_idx, sentence, sentence_queue))
+                                tts_task = asyncio.create_task(fetch_tts_to_queue(sentence_idx, sentence, sentence_queue))
+                                tts_tasks.add(tts_task)
+                                tts_task.add_done_callback(tts_tasks.discard)
                                 await tts_queue_queue.put(sentence_queue)
                         except Exception as exc:
                             logger.error(f"LLM sentence producer failed: {exc}")
@@ -825,6 +908,12 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                                 f"offset_ms={int(round((audio_start_at - llm_start) * 1000))} "
                                                 f"at={audio_start_iso}"
                                             )
+                                            if sentence_idx == 1:
+                                                logger.info(
+                                                    f"[{turn_id}] [EXPLICIT_TIMING] Sentence 1 first audio byte sent "
+                                                    f"offset_ms={int(round((audio_start_at - llm_start) * 1000))} "
+                                                    f"at={audio_start_iso}"
+                                                )
                                             if first_audio_sent_at is None:
                                                 first_audio_sent_at = audio_start_at
                                         await websocket.send_bytes(item)
@@ -842,6 +931,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         llm_sentence_producer(),
                         tts_audio_consumer()
                     )
+                    if tts_tasks:
+                        await asyncio.gather(*tts_tasks, return_exceptions=True)
 
                 try:
                     logger.info("Attempting LLM stream first try...")

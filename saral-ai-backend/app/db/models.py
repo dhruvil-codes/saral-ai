@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     business_name TEXT,
     whatsapp_number TEXT,
+    saral_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -104,6 +105,7 @@ class User(BaseModel):
     password_hash: str
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    saral_active: Optional[bool] = True
     vad_threshold_ms: Optional[int] = 1000
     notification_preference: Optional[str] = "urgent_only"
     created_at: datetime
@@ -115,6 +117,7 @@ class UserResponse(BaseModel):
     email: str
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    saral_active: Optional[bool] = True
     vad_threshold_ms: Optional[int] = 1000
     notification_preference: Optional[str] = "urgent_only"
     created_at: datetime
@@ -182,5 +185,4 @@ class Booking(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
 

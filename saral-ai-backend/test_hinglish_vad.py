@@ -39,7 +39,7 @@ class TestHinglishAndVAD(unittest.TestCase):
         scenarios = [
             # format: (scenario_name, transcript_content, pause_ms, expected_early_trigger)
             ("Scenario 1: Tuesday appointment", "Mera appointment Tuesday ko hai, basically", 900, False),
-            ("Scenario 2: Service pricing query", "Actually hair spa pricing kitna hoga, tell me?", 800, False),
+            ("Scenario 2: Service pricing query", "Actually consultation pricing kitna hoga, tell me?", 800, False),
             ("Scenario 3: Sunday opening check", "Sunday ko standard packages available hain kya?", 950, False),
             ("Scenario 4: Direct booking", "Mera naam Priya hai aur mujhe booking karni hai", 700, False),
             ("Scenario 5: Time reschedule", "Tuesday ko can we coordinate 3 PM slot instead?", 600, False),
@@ -47,7 +47,7 @@ class TestHinglishAndVAD(unittest.TestCase):
             ("Scenario 7: Urgent slot request", "Kya kal subah 10 baje ka slot khali hai?", 500, False),
             ("Scenario 8: Cancel slot", "Mujhe booking cancel karni hai, some urgent work came up", 900, False),
             ("Scenario 9: Discount check", "Standard rate par extra discount milega kya?", 750, False),
-            ("Scenario 10: Location check", "Glamour Salon ka location kya hai, nearby landmark?", 800, False),
+            ("Scenario 10: Location check", "City Physiotherapy Clinic ka location kya hai, nearby landmark?", 800, False),
             ("Scenario 11: Call verification", "Hello, main booking check karne ke liye call kiya", 950, False),
             ("Scenario 12: Wait time check", "Rescheduling me kitna time lagta hai, coordinate please", 650, False),
             ("Scenario 13: Payment mode query", "Online payment options open hain ya cash only?", 880, False),
@@ -128,7 +128,7 @@ class TestHinglishAndVAD(unittest.TestCase):
             mock_response_fallback
         ]
 
-        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key"}):
+        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key", "GROQ_API_KEY": ""}):
             # Requesting with Hindi (hi-IN)
             transcript = speech_to_text(b"mocked-audio-bytes", "hi-IN")
             
@@ -155,7 +155,7 @@ class TestHinglishAndVAD(unittest.TestCase):
         }
         mock_client.return_value.__enter__.return_value.post.side_effect = [mock_response_high]
 
-        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key"}):
+        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key", "GROQ_API_KEY": ""}):
             transcript = speech_to_text(b"mocked-audio-bytes", "hi-IN")
             self.assertEqual(transcript, "High confidence transcription result")
             self.assertEqual(mock_client.return_value.__enter__.return_value.post.call_count, 1)

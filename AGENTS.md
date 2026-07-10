@@ -1,3 +1,17 @@
+## Rules
+1. Stay strictly in scope — only touch files listed in your task; if a fix needs another file, stop and report instead of expanding scope.
+2. Show current code before changing it, and verify every fix with an actual test run/output — never claim "done" without proof.
+3. Don't touch already-tuned config (FIREWORKS_MODEL, VAD thresholds, leads.budget) unless explicitly told to.
+
+## Skills
+- **frontend-design / tailwind** — any UI work (clinic config, dashboard trim, styling)
+- **shadcn** — when adding/modifying shadcn components, don't guess the API
+- **supabase-postgres-best-practices** — any task reading/writing DB fields (confirm exact column names first)
+- **webapp-testing** — after any dashboard/nav change, click through and verify before declaring done
+- **vercel-react-best-practices** — any new React/Next.js component or hook logic
+- **deploy-to-vercel** — deployment step only
+
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

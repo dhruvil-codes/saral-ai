@@ -2,7 +2,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
-from app.api import auth, faqs, ws_call, calls, bookings, callback
+from app.api import auth, faqs, ws_call, calls, bookings, callback, leads
 from app.api.auth import get_current_user
 from app.workers import faq_worker, digest_worker
 import asyncio
@@ -23,7 +23,10 @@ async def lifespan(app: FastAPI):
     from app.workers.digest_worker import daily_digest_scheduler_loop
     
     logger.info("Lifespan startup: initializing fallback audio...")
-    await run_in_threadpool(initialize_fallback_audio)
+    try:
+        await run_in_threadpool(initialize_fallback_audio)
+    except Exception as e:
+        logger.warning(f"Failed to initialize fallback audio on startup: {e}")
     
     logger.info("Lifespan startup: loading semantic cache from Redis...")
     try:
@@ -61,6 +64,7 @@ app = FastAPI(title="Saral AI Backend", lifespan=lifespan)
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(faqs.router, prefix="/api")
 app.include_router(calls.router, prefix="/api")
+app.include_router(leads.router, prefix="/api")
 app.include_router(bookings.router, prefix="/api")
 app.include_router(callback.router, prefix="/api")
 app.include_router(faq_worker.router, prefix="/api")
@@ -74,5 +78,6 @@ def health():
 @app.get("/api/auth/me")
 def read_current_user(current_user: dict = Depends(get_current_user)):
     return {"user": current_user}
+
 
 

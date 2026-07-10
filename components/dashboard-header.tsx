@@ -144,7 +144,7 @@ export default function DashboardHeader() {
             </div>
             <div>
               <span className="font-bold text-xs text-[var(--color-text-primary)] block">
-                Sharma Hair Salon
+                City Physiotherapy Clinic
               </span>
               <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
                 AI Agent Active
