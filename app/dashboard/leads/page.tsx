@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 import {
   Card,
   CardContent,
@@ -18,59 +19,144 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 
-const leads = [
-  { name: "Ananya Sharma", phone: "+91 98765 43210", intent: "Haircut", urgency: "High", status: "New" },
-  { name: "Ravi Patel", phone: "+91 87654 32109", intent: "Consultation", urgency: "Medium", status: "Contacted" },
-  { name: "Priya Mehta", phone: "+91 76543 21098", intent: "Appointment", urgency: "Low", status: "New" },
-  { name: "Arjun Singh", phone: "+91 65432 10987", intent: "Haircut", urgency: "High", status: "Contacted" },
-  { name: "Kavita Nair", phone: "+91 54321 09876", intent: "Coloring", urgency: "Medium", status: "New" },
-  { name: "Suresh Kumar", phone: "+91 43210 98765", intent: "Consultation", urgency: "Low", status: "Contacted" },
-  { name: "Deepa Reddy", phone: "+91 32109 87654", intent: "Appointment", urgency: "High", status: "New" },
-  { name: "Mohan Joshi", phone: "+91 21098 76543", intent: "Haircut", urgency: "Medium", status: "New" },
-  { name: "Lalitha Krishnan", phone: "+91 10987 65432", intent: "Consultation", urgency: "Low", status: "Contacted" },
-  { name: "Vikram Bose", phone: "+91 09876 54321", intent: "Coloring", urgency: "High", status: "New" },
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+type CaseCard = {
+  id: string;
+  caller_number: string;
+  name: string | null;
+  interest: string | null;
+  urgency_level: string | null;
+  patient_type: string | null;
+  requested_slot: string | null;
+  recommended_action: string | null;
+  language: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+const sampleCaseCards: CaseCard[] = [
+  {
+    id: "sample-1",
+    caller_number: "+91 98765 43210",
+    name: "Ananya Sharma",
+    interest: "Severe lower back pain after lifting a heavy bag",
+    urgency_level: "same_day",
+    patient_type: "new",
+    requested_slot: "Today evening",
+    recommended_action: "book_appointment",
+    language: "Hindi",
+    status: "new",
+    created_at: null,
+  },
+  {
+    id: "sample-2",
+    caller_number: "+91 87654 32109",
+    name: "Ravi Patel",
+    interest: "Dental pain and sensitivity while eating",
+    urgency_level: "urgent",
+    patient_type: "existing",
+    requested_slot: "As soon as possible",
+    recommended_action: "callback_now",
+    language: "English",
+    status: "new",
+    created_at: null,
+  },
 ];
 
 const urgencyVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  High: "destructive",
-  Medium: "default",
-  Low: "secondary",
+  urgent: "destructive",
+  same_day: "default",
+  routine: "secondary",
+  faq_only: "outline",
 };
 
-const statusVariant: Record<string, "default" | "secondary" | "outline"> = {
-  New: "default",
-  Contacted: "secondary",
-};
+const formatValue = (value: string | null | undefined) => value || "-";
+
+const formatLabel = (value: string | null | undefined) =>
+  formatValue(value).replace(/_/g, " ");
 
 export default function LeadsPage() {
   const [search, setSearch] = useState("");
+  const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [usingFallback, setUsingFallback] = useState(false);
 
-  const filtered = leads.filter(
-    (l) =>
-      l.name.toLowerCase().includes(search.toLowerCase()) ||
-      l.phone.includes(search) ||
-      l.intent.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    async function loadCaseCards() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) {
+          setCaseCards(sampleCaseCards);
+          setUsingFallback(true);
+          return;
+        }
+
+        const res = await fetch(`${BACKEND_URL}/api/leads`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch case cards");
+        }
+
+        const data: CaseCard[] = await res.json();
+        setCaseCards(data);
+        setUsingFallback(false);
+      } catch (err) {
+        console.error("Failed to fetch case cards, using fallback sample data", err);
+        setCaseCards(sampleCaseCards);
+        setUsingFallback(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadCaseCards();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const query = search.toLowerCase();
+    return caseCards.filter((card) =>
+      [
+        card.name,
+        card.caller_number,
+        card.interest,
+        card.urgency_level,
+        card.patient_type,
+        card.requested_slot,
+        card.recommended_action,
+        card.language,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [caseCards, search]);
 
   return (
     <div className="flex flex-col gap-4 py-4">
       <Card>
         <CardHeader>
-          <CardTitle>Leads</CardTitle>
+          <CardTitle>Case Cards</CardTitle>
           <CardDescription>
-            {leads.length} total leads captured from voice calls
+            {loading
+              ? "Loading structured Stage 2 triage summaries..."
+              : `${caseCards.length} structured patient case cards from voice calls`}
+            {usingFallback ? " Sample data shown until backend case cards are available." : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Toolbar */}
           <div className="flex items-center gap-2 mb-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
               <Input
-                placeholder="Search leads..."
+                placeholder="Search case cards..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8"
@@ -81,35 +167,50 @@ export default function LeadsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone Number</TableHead>
-                <TableHead>Intent</TableHead>
+                <TableHead>Patient</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Complaint</TableHead>
                 <TableHead>Urgency</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Requested Slot</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Language</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((lead) => (
-                <TableRow key={lead.phone}>
-                  <TableCell className="font-medium">{lead.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{lead.phone}</TableCell>
-                  <TableCell>{lead.intent}</TableCell>
-                  <TableCell>
-                    <Badge variant={urgencyVariant[lead.urgency]} className="text-xs">
-                      {lead.urgency}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant[lead.status]} className="text-xs">
-                      {lead.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filtered.length === 0 && (
+              {filtered.map((card) => {
+                const urgency = card.urgency_level || "routine";
+                return (
+                  <TableRow key={card.id}>
+                    <TableCell className="font-medium">
+                      {formatValue(card.name)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatValue(card.caller_number)}
+                    </TableCell>
+                    <TableCell className="max-w-[260px]">
+                      <span className="line-clamp-2">{formatValue(card.interest)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={urgencyVariant[urgency] || "secondary"} className="text-xs capitalize">
+                        {formatLabel(urgency)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {formatLabel(card.patient_type)}
+                    </TableCell>
+                    <TableCell>{formatValue(card.requested_slot)}</TableCell>
+                    <TableCell className="capitalize">
+                      {formatLabel(card.recommended_action)}
+                    </TableCell>
+                    <TableCell>{formatValue(card.language)}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {!loading && filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No leads found.
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    No case cards found.
                   </TableCell>
                 </TableRow>
               )}
@@ -120,3 +221,5 @@ export default function LeadsPage() {
     </div>
   );
 }
+
+

@@ -2,41 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Users, 
-  PhoneCall, 
-  HelpCircle, 
-  Settings,
-  Bot
-} from "lucide-react";
+import { Users, PhoneCall, HelpCircle, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
-  {
-    name: "Overview",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    name: "Leads",
-    href: "/dashboard/leads",
-    icon: Users,
-  },
   {
     name: "Call Logs",
     href: "/dashboard/calls",
     icon: PhoneCall,
   },
   {
-    name: "Knowledge Base",
-    href: "/dashboard/faqs",
-    icon: HelpCircle,
+    name: "Case Cards",
+    href: "/dashboard/leads",
+    icon: Users,
   },
   {
-    name: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
+    name: "Clinic FAQ/Config",
+    href: "/dashboard/faqs",
+    icon: HelpCircle,
   },
 ];
 
@@ -55,7 +38,7 @@ export default function DashboardSidebar() {
             Saral AI
           </span>
           <span className="text-[10px] text-[var(--color-text-secondary)] font-semibold uppercase tracking-wider block -mt-1">
-            MSME Voice Partner
+            AI Front Desk for Clinics
           </span>
         </div>
       </div>
@@ -92,7 +75,7 @@ export default function DashboardSidebar() {
           </div>
           <div className="overflow-hidden">
             <span className="font-bold text-sm text-[var(--color-text-primary)] block truncate leading-none">
-              Sharma Hair Salon
+              City Physiotherapy Clinic
             </span>
             <span className="text-[10px] text-[var(--color-text-muted)] font-medium mt-1 inline-flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>

@@ -73,7 +73,7 @@ export default function Home() {
           
           {/* Social Proof */}
           <p className="text-sm !text-white/65 font-medium mb-12">
-            Trusted by salons, boutiques & brokers across India
+            Trusted by physiotherapy and dental clinics across India
           </p>
           
           {/* Browser Mockup Card */}

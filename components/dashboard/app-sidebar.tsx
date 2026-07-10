@@ -3,15 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Users,
   Phone,
   BookOpen,
-  Settings,
   LogOut,
   ChevronsUpDown,
   User2,
-  Mic,
 } from "lucide-react";
 import { SaralLogoMark } from "@/assets/logo/logo";
 
@@ -38,43 +35,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
   {
-    title: "Main",
+    title: "Clinic",
     items: [
-      {
-        title: "Overview",
-        url: "/dashboard",
-        icon: LayoutDashboard,
-        exact: true,
-      },
-      {
-        title: "Leads",
-        url: "/dashboard/leads",
-        icon: Users,
-      },
       {
         title: "Call Logs",
         url: "/dashboard/calls",
         icon: Phone,
       },
       {
-        title: "Knowledge Base",
+        title: "Case Cards",
+        url: "/dashboard/leads",
+        icon: Users,
+      },
+      {
+        title: "Clinic FAQ/Config",
         url: "/dashboard/faqs",
         icon: BookOpen,
-      },
-      {
-        title: "Test Agent",
-        url: "/dashboard/test-agent",
-        icon: Mic,
-      },
-    ],
-  },
-  {
-    title: "General",
-    items: [
-      {
-        title: "Settings",
-        url: "/dashboard/settings",
-        icon: Settings,
       },
     ],
   },
@@ -83,10 +59,7 @@ const navItems = [
 export function AppSidebar() {
   const pathname = usePathname();
 
-  const isActive = (url: string, exact?: boolean) => {
-    if (exact) return pathname === url;
-    return pathname.startsWith(url);
-  };
+  const isActive = (url: string) => pathname.startsWith(url);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/60">
@@ -95,14 +68,14 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="h-12 rounded-lg px-2 text-[#555555] bg-transparent hover:bg-[#f5a623] hover:text-black transition-colors duration-150">
-              <Link href="/dashboard" className="flex items-center gap-2.5">
+              <Link href="/dashboard/calls" className="flex items-center gap-2.5" aria-label="Saral AI Clinic Voice AI">
                 <SaralLogoMark size={28} fill="#000000" className="shrink-0" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold tracking-tight text-base" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>
                     Saral AI
                   </span>
                   <span className="truncate text-xs text-muted-foreground">
-                    Voice AI Dashboard
+                    Clinic Voice AI
                   </span>
                 </div>
               </Link>
@@ -121,7 +94,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {group.items.map((item) => {
-                  const active = isActive(item.url, item.exact);
+                  const active = isActive(item.url);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -144,7 +117,7 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      {/* Footer — user menu */}
+      {/* Footer - user menu */}
       <SidebarFooter className="border-t border-border/60 py-2">
         <SidebarMenu>
           <SidebarMenuItem>

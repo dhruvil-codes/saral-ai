@@ -1,5 +1,7 @@
 "use client";
 
+
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -14,7 +16,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Settings } from "lucide-react";
 
 const breadcrumbMap: Record<string, { label: string; parent?: string }> = {
   "/dashboard": { label: "Overview" },
@@ -80,6 +82,17 @@ export function SiteHeader() {
           <Bell className="size-4" />
           {/* Notification dot */}
           <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-blue-500" />
+        </Button>
+
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        >
+          <Link href="/dashboard/settings" aria-label="Clinic settings">
+            <Settings className="size-4" />
+          </Link>
         </Button>
 
         {/* User Avatar */}

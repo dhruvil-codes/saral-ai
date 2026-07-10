@@ -166,7 +166,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                     "email": supabase_user.email,
                     "password_hash": "supabase_auth", # placeholder since auth is delegated
                     "business_name": "My Business",
-                    "whatsapp_number": ""
+                    "whatsapp_number": "",
+                    "saral_active": True
                 }
                 insert_response = supabase.table("users").insert(user_data).execute()
                 if insert_response.data:
@@ -182,6 +183,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 class SettingsUpdateRequest(BaseModel):
     business_name: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    saral_active: Optional[bool] = None
     vad_threshold_ms: Optional[int] = None
     notification_preference: Optional[str] = None
 
@@ -196,6 +198,8 @@ async def update_settings(
         update_data["business_name"] = body.business_name
     if body.whatsapp_number is not None:
         update_data["whatsapp_number"] = body.whatsapp_number
+    if body.saral_active is not None:
+        update_data["saral_active"] = body.saral_active
     if body.vad_threshold_ms is not None:
         val = body.vad_threshold_ms
         update_data["vad_threshold_ms"] = max(600, min(2000, val))
@@ -229,6 +233,7 @@ async def update_settings(
                 "email": updated_user["email"],
                 "business_name": updated_user.get("business_name"),
                 "whatsapp_number": updated_user.get("whatsapp_number"),
+                "saral_active": updated_user.get("saral_active", True),
                 "vad_threshold_ms": updated_user.get("vad_threshold_ms", 1000),
                 "notification_preference": updated_user.get("notification_preference", "urgent_only")
             }
@@ -238,3 +243,4 @@ async def update_settings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database update error: {str(e)}"
         )
+
