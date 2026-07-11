@@ -5,8 +5,11 @@ Handles incoming call webhooks and retrieval of call history.
 
 import logging
 from datetime import datetime, timezone
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel
 from app.db.supabase_client import get_supabase
+from app.api.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -69,3 +72,35 @@ async def incoming_call(request: Request, user_id: str = None, language: str = "
 </Response>"""
 
     return Response(content=twiml_response, media_type="application/xml")
+
+
+class CallResponse(BaseModel):
+    id: str
+    user_id: str
+    caller_number: str
+    transcript: Optional[str] = None
+    summary: Optional[str] = None
+    status: str
+    started_at: str
+    ended_at: Optional[str] = None
+
+
+@router.get("/calls", response_model=List[CallResponse])
+async def get_calls(current_user: dict = Depends(get_current_user)):
+    """Retrieve call history for the authenticated user."""
+    supabase = get_supabase()
+    try:
+        response = (
+            supabase.table("call_logs")
+            .select("id, user_id, caller_number, transcript, summary, status, started_at, ended_at")
+            .eq("user_id", current_user["id"])
+            .order("started_at", desc=True)
+            .execute()
+        )
+        return response.data or []
+    except Exception as e:
+        logger.error(f"Failed to query call logs: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch call logs: {str(e)}"
+        )
