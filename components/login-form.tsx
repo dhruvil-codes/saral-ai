@@ -46,7 +46,7 @@ export function LoginForm({
     try {
       const supabase = createClient();
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -55,6 +55,11 @@ export function LoginForm({
         });
         if (error) {
           toast.error(`Sign Up Error: ${error.message}`);
+        } else if (data.session) {
+          // Email confirmation disabled: session is immediate — go to dashboard
+          // where /api/auth/me will provision the user and open onboarding.
+          toast.success("Account created! Setting up your workspace...");
+          window.location.href = "/dashboard";
         } else {
           toast.success("Account created! Please check your email for confirmation.");
         }
