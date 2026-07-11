@@ -63,12 +63,13 @@ async def signup(body: SignupRequest):
     # 2. Hash the password with bcrypt
     password_hash = pwd_context.hash(body.password)
 
-    # 3. Insert new row into users table
+    # 3. Insert new row into users table (inactive until onboarding completes)
     user_data = {
         "email": body.email,
         "password_hash": password_hash,
         "business_name": body.business_name,
-        "whatsapp_number": body.whatsapp_number
+        "whatsapp_number": body.whatsapp_number,
+        "saral_active": False,
     }
     
     try:
@@ -160,20 +161,32 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             if response.data:
                 return response.data[0]
             else:
-                # If they are logged in via Supabase but don't have a record in users, create one
+                # Brand-new Supabase Auth user: provision an inactive profile so the
+                # dashboard can detect first-run and open the onboarding wizard.
+                # Do NOT pre-fill business_name or mark saral_active — that made new
+                # accounts look already configured with mock/demo data.
                 user_data = {
                     "id": user_id,
                     "email": supabase_user.email,
                     "password_hash": "supabase_auth", # placeholder since auth is delegated
-                    "business_name": "My Business",
+                    "business_name": "",
                     "whatsapp_number": "",
-                    "saral_active": True
+                    "saral_active": False
                 }
-                insert_response = supabase.table("users").insert(user_data).execute()
-                if insert_response.data:
-                    return insert_response.data[0]
+                try:
+                    insert_response = supabase.table("users").insert(user_data).execute()
+                    if insert_response.data:
+                        return insert_response.data[0]
+                except Exception as insert_err:
+                    logger.warning(f"Auto-provision insert failed (likely duplicate): {insert_err}")
+                # Insert returned no data or raised (e.g. duplicate key race condition) — re-fetch
+                retry = supabase.table("users").select("*").eq("id", user_id).execute()
+                if retry.data:
+                    return retry.data[0]
+                logger.error(f"Could not provision or find user {user_id} in public.users")
     except Exception as e:
-        logger.error(f"Supabase JWT auth failed: {e}")
+        import traceback
+        logger.error(f"Supabase JWT auth failed: {e}\n{traceback.format_exc()}")
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
