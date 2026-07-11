@@ -44,12 +44,9 @@ def _has_speakable_alnum(text: str) -> bool:
 def _schedule_background_task(coro) -> asyncio.Task:
     """Creates an asyncio task, holds a reference to prevent GC, and auto-removes
     the reference via a done-callback when the task completes or is cancelled."""
-    # DIAG-1: confirm BACKGROUND_TASKS is the same module-level object each call
-    print(f"[DIAG-1] _schedule_background_task called. id(BACKGROUND_TASKS)={id(BACKGROUND_TASKS)} len_before={len(BACKGROUND_TASKS)}", flush=True)
     task = asyncio.create_task(coro)
     BACKGROUND_TASKS.add(task)
     task.add_done_callback(BACKGROUND_TASKS.discard)
-    print(f"[DIAG-1] Task created and stored. id(BACKGROUND_TASKS)={id(BACKGROUND_TASKS)} len_after={len(BACKGROUND_TASKS)}", flush=True)
     return task
 
 class ConnectionManager:
@@ -137,8 +134,7 @@ async def run_stage2_triage_background(call_id: str, user_id: str, caller_number
     requested_slot, recommended_action, language) instead of JSON-stringifying
     everything into the deprecated 'budget' column.
     """
-    # DIAG-2: guaranteed-flush print BEFORE any async/IO — tells us if we were even entered
-    print(f"[DIAG-2] run_stage2_triage_background ENTERED. call_id={call_id} transcript_len={len(transcript)}", flush=True)
+
     logger.info(f"Starting Stage 2 triage background task for call_id={call_id}")
     try:
         from app.services.stage2_triage import extract_case_summary
@@ -1068,15 +1064,13 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 raise ws_disc
             except Exception as e:
                 # Log exception per step without crashing the WebSocket
-                # DIAG-3: show exception type and conversation_history length at time of inner except
-                print(f"[DIAG-3] Inner except caught: type={type(e).__name__} msg={e!r} conversation_history_len={len(conversation_history)}", flush=True)
+
                 logger.error(f"Error processing voice call step: {str(e)}", exc_info=True)
                 try:
                     await websocket.send_json({
                         "error": str(e)
                     })
                 except Exception as send_err:
-                    print(f"[DIAG-3] send_json(error) also failed: {type(send_err).__name__} -- breaking loop. conversation_history_len={len(conversation_history)}", flush=True)
                     logger.error(f"Failed to send error message to client: {str(send_err)}")
                     # If sending failed, connection might be broken, so break loop
                     break
@@ -1091,8 +1085,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
         except Exception:
             pass
         manager.disconnect(websocket)
-        # DIAG-4: show conversation_history state at the moment finally runs
-        print(f"[DIAG-4] finally block reached. call_id={call_id} user_id={user_id} conversation_history_len={len(conversation_history)}", flush=True)
+
         logger.info("WebSocket call session finished. Cleaning up.")
         
         # Check for any pending bookings made during this call session to trigger recovery
@@ -1124,8 +1117,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 logger.error(f"Failed to check pending bookings or trigger recovery task: {recovery_err}", exc_info=True)
 
         # Perform post-call updates
-        # DIAG-4b: this is the GATE — if conversation_history is empty, triage is NEVER scheduled
-        print(f"[DIAG-4b] conversation_history gate check: len={len(conversation_history)} -> will_enter={bool(conversation_history)}", flush=True)
+
         if conversation_history:
             # 1. Compile the full transcript
             full_transcript = "\n".join([
@@ -1222,8 +1214,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     db_transcript = db_res.data[0].get("transcript") or ""
                     db_caller_number = db_res.data[0].get("caller_number") or "unknown"
                     
-                    # DIAG-5: confirm we actually reach the scheduling call
-                    print(f"[DIAG-5] About to schedule Stage 2 triage. call_id={call_id} db_transcript_len={len(db_transcript)}", flush=True)
+
                     _schedule_background_task(
                         run_stage2_triage_background(
                             call_id=call_id,
@@ -1232,7 +1223,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                             transcript=db_transcript
                         )
                     )
-                    print(f"[DIAG-5] Stage 2 triage task scheduled.", flush=True)
+
                 else:
                     logger.warning(f"No call log found for call_id={call_id} in DB. Stage 2 triage skipped.")
             except Exception as triage_sched_err:
