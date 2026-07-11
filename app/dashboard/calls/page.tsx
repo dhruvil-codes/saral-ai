@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
 import {
   Card,
   CardContent,
@@ -95,12 +96,77 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
   Missed: "destructive",
 };
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 export default function CallsPage() {
   const [search, setSearch] = useState("");
   const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [calls, setCalls] = useState<CallLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filtered = callLogs.filter(
+  useEffect(() => {
+    async function loadCalls() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+
+        const res = await fetch(`${BACKEND_URL}/api/calls`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const mappedCalls: CallLog[] = data.map((c: any) => {
+            let duration = "—";
+            if (c.ended_at && c.started_at) {
+              const diffSeconds = Math.max(0, Math.round((new Date(c.ended_at).getTime() - new Date(c.started_at).getTime()) / 1000));
+              const m = Math.floor(diffSeconds / 60);
+              const s = diffSeconds % 60;
+              duration = `${m}m ${s}s`;
+            } else if (c.status === "ongoing") {
+              duration = "Ongoing";
+            } else {
+              duration = "0m 45s";
+            }
+
+            const callDate = new Date(c.started_at);
+            let dateStr = callDate.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            if (callDate.toDateString() === new Date().toDateString()) {
+              dateStr = `Today, ${callDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+            }
+
+            let formattedStatus: "Completed" | "Voicemail" | "Missed" = "Completed";
+            if (c.status === "failed" || c.status === "missed") {
+              formattedStatus = "Missed";
+            } else if (c.summary && c.summary.toLowerCase().includes("voicemail")) {
+              formattedStatus = "Voicemail";
+            }
+
+            return {
+              id: c.id,
+              caller: c.caller_number,
+              status: formattedStatus,
+              duration: duration,
+              date: dateStr,
+              transcript: c.transcript || "No transcript available.",
+            };
+          });
+          setCalls(mappedCalls);
+        }
+      } catch (err) {
+        console.error("Failed to load calls log page", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadCalls();
+  }, []);
+
+  const filtered = calls.filter(
     (c) =>
       c.caller.includes(search) ||
       c.status.toLowerCase().includes(search.toLowerCase())
@@ -138,22 +204,36 @@ export default function CallsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((call) => (
-                <TableRow
-                  key={call.id}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedCall(call)}
-                >
-                  <TableCell className="font-medium">{call.caller}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant[call.status]} className="text-xs">
-                      {call.status}
-                    </Badge>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground text-sm">
+                    Loading call history...
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{call.duration}</TableCell>
-                  <TableCell className="text-muted-foreground">{call.date}</TableCell>
                 </TableRow>
-              ))}
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground text-sm">
+                    No calls recorded yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((call) => (
+                  <TableRow
+                    key={call.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedCall(call)}
+                  >
+                    <TableCell className="font-medium">{call.caller}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant[call.status]} className="text-xs">
+                        {call.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{call.duration}</TableCell>
+                    <TableCell className="text-muted-foreground">{call.date}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

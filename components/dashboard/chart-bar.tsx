@@ -35,10 +35,15 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function ChartBar() {
-  const totalCalls = chartData.reduce((acc, curr) => acc + curr.calls, 0);
-  const avgCalls = Math.round(totalCalls / chartData.length);
-  const peakDay = [...chartData].sort((a, b) => b.calls - a.calls)[0];
+interface ChartBarProps {
+  data?: { day: string; calls: number; peakTime: string }[];
+}
+
+export function ChartBar({ data }: ChartBarProps) {
+  const displayData = data || chartData;
+  const totalCalls = displayData.reduce((acc, curr) => acc + curr.calls, 0);
+  const avgCalls = displayData.length > 0 ? Math.round(totalCalls / displayData.length) : 0;
+  const peakDay = displayData.length > 0 ? [...displayData].sort((a, b) => b.calls - a.calls)[0] : null;
 
   return (
     <Card className="dashboard-card border border-border/60 rounded-xl bg-card shadow-xs transition-all duration-200 py-0 gap-0 overflow-hidden">
@@ -74,7 +79,7 @@ export function ChartBar() {
         <ChartContainer config={chartConfig} className="h-[280px] w-full">
           <BarChart
             accessibilityLayer
-            data={chartData}
+            data={displayData}
             margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
           >
             <defs>
@@ -119,30 +124,41 @@ export function ChartBar() {
               radius={[6, 6, 0, 0]}
               animationDuration={1000}
             >
-              {chartData.map((entry, index) => (
+              {displayData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill="url(#barGradient)"
-                  className="transition-all duration-200 cursor-pointer hover:opacity-85"
                 />
               ))}
             </Bar>
           </BarChart>
         </ChartContainer>
 
-        {/* Dynamic Summary Footer */}
-        <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground">Daily Average</span>
-            <span className="font-mono font-medium text-foreground">{avgCalls} calls / day</span>
+        {/* Dynamic Insights Row */}
+        <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-border/60">
+          <div className="space-y-1">
+            <span className="text-[10px] font-sans font-semibold text-muted-foreground uppercase tracking-widest">
+              Peak hour calls
+            </span>
+            <p className="text-sm font-sans font-semibold text-foreground">
+              {peakDay ? peakDay.calls : 0} calls
+            </p>
           </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-muted-foreground">Peak Day</span>
-            <span className="font-mono font-medium text-foreground">{peakDay.day} ({peakDay.calls} calls)</span>
+          <div className="space-y-1 border-x border-border/60 px-4">
+            <span className="text-[10px] font-sans font-semibold text-muted-foreground uppercase tracking-widest">
+              Peak traffic period
+            </span>
+            <p className="text-sm font-sans font-semibold text-foreground">
+              {peakDay ? peakDay.peakTime : "—"}
+            </p>
           </div>
-          <div className="flex flex-col gap-0.5 col-span-2 sm:col-span-1">
-            <span className="text-muted-foreground">Highest Activity</span>
-            <span className="font-mono font-medium text-foreground">{peakDay.peakTime}</span>
+          <div className="space-y-1 pl-1">
+            <span className="text-[10px] font-sans font-semibold text-muted-foreground uppercase tracking-widest">
+              Average load
+            </span>
+            <p className="text-sm font-sans font-semibold text-foreground">
+              {avgCalls} calls/day
+            </p>
           </div>
         </div>
       </CardContent>

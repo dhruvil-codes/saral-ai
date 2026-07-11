@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,6 +12,7 @@ import {
   User2,
 } from "lucide-react";
 import { SaralLogoMark } from "@/assets/logo/logo";
+import { createClient } from "@/utils/supabase/client";
 
 import {
   Sidebar,
@@ -58,8 +60,60 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [email, setEmail] = useState("admin@saral.ai");
+  const [businessName, setBusinessName] = useState("Admin");
 
   const isActive = (url: string) => pathname.startsWith(url);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function fetchUser(session: any) {
+      if (!session?.access_token) return;
+      try {
+        const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+        const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const user = data.user;
+          if (user) {
+            setEmail(user.email || "admin@saral.ai");
+            setBusinessName(user.business_name || "Admin");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load user info in sidebar", err);
+      }
+    }
+
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchUser(session);
+      }
+    });
+
+    // Listen to changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchUser(session);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/60">
@@ -128,15 +182,15 @@ export function AppSidebar() {
                   className="h-10 rounded-lg px-2 data-[state=open]:bg-muted"
                 >
                   <Avatar className="size-7 rounded-lg shrink-0">
-                    <AvatarImage src="" alt="Admin" />
+                    <AvatarImage src="" alt={businessName} />
                     <AvatarFallback className="rounded-lg bg-foreground text-background text-xs font-semibold">
-                      SA
+                      {businessName.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight ml-1">
-                    <span className="truncate font-semibold text-sm">Admin</span>
+                    <span className="truncate font-semibold text-sm">{businessName}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      admin@saral.ai
+                      {email}
                     </span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-3.5 text-muted-foreground" />
@@ -152,7 +206,7 @@ export function AppSidebar() {
                   <User2 className="size-4 text-muted-foreground" />
                   Account
                 </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
                   <LogOut className="size-4" />
                   Log out
                 </DropdownMenuItem>

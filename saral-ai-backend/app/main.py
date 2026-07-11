@@ -59,7 +59,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Error during lifespan task cancellation: {e}")
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Saral AI Backend", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(faqs.router, prefix="/api")
