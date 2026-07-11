@@ -1,211 +1,117 @@
-# Saral AI 🎙️
+# Saral AI — Multilingual Voice Intake & Triage Agent for Indian Clinics
 
-> Low-Latency, Real-Time Voice AI Receptionist for MSMEs
+**AMD Developer Hackathon Act II — Track 3 (Unicorn)**
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react)](https://react.dev/)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python)](https://www.python.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+Saral AI is a multilingual voice AI agent built for small Indian clinics (physiotherapy/dental) that answers patient calls 24/7 in Hindi, Marathi, and English. It has a natural voice conversation to understand symptoms and needs, classifies urgency, captures booking details, and sends the clinic's front desk a structured case summary via WhatsApp — so no urgent call gets missed.
 
-Saral AI is an intelligent, real-time voice receptionist built to help Micro, Small, and Medium Enterprises (MSMEs) handle customer phone calls automatically. It operates over a bi-directional WebSocket connection to answer business queries, capture high-intent customer leads, and provide instant response streaming in regional languages.
+## The Problem
 
----
+Small clinics lose patients to missed calls, and — more critically — sometimes miss genuinely urgent cases because front-desk staff can't answer every call, especially after hours or during rush periods. Saral makes sure every call gets answered, understood, and triaged correctly.
 
-## 📌 Table of Contents
-
-- [Key Features](#-key-features)
-- [System Architecture](#-system-architecture)
-- [Tech Stack](#-tech-stack)
-- [Directory Structure](#-directory-structure)
-- [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-- [Real-Time Voice Pipeline](#-real-time-voice-pipeline)
-- [Background Workers & Notifications](#-background-workers--notifications)
-- [Database Schema](#-database-schema)
-- [Telemetry & Latency Diagnostics](#-telemetry--latency-diagnostics)
-
----
-
-## ✨ Key Features
-
-- **Bidirectional Streaming Audio**: Continuous full-duplex WebSocket communication (`/ws/call`) for natural, low-latency conversational turns.
-- **Multilingual Speech Intelligence**: Powered by Sarvam AI models (`saaras:v3` for Speech-to-Text and `bulbul:v3` for streaming Text-to-Speech) optimized for regional language nuances.
-- **Sub-Second LLM Conversational Logic**: Integrates Groq LLM (`openai/gpt-oss-20b`) to process context-aware responses with minimum turnaround delay.
-- **Adaptive Voice Activity Detection (VAD)**: Utilizes `webrtcvad` with RMS energy fallback to detect end-of-speech silence thresholds dynamically. Supports streaming raw PCM and containerized formats (WebM, Ogg, WAV).
-- **Automated Lead Extraction**: Captures key customer metrics directly from audio transcripts, including caller intent, urgency level, budget, and contact information.
-- **Fault-Tolerant Audio Caching**: Features pre-cached fallback responses in memory to maintain call stability if third-party APIs experience transient timeouts.
-- **Real-Time Analytics & FAQ Control**: Administrative dashboard enabling business owners to update knowledge bases and view call logs.
-
----
-
-## 🏗️ System Architecture
-<img width="992" height="498" alt="image" src="https://github.com/user-attachments/assets/9160ac6e-b93e-4cb2-920d-da6477e7155d" />
-
-
-## 🛠️ Tech Stack
-
-| Domain | Technologies |
-| :--- | :--- |
-| **Frontend Framework** | Next.js 16 (App Router), React 19, TypeScript |
-| **Styling & UI** | Tailwind CSS v4, Framer Motion, Lucide Icons, Radix UI |
-| **Backend Framework** | Python 3.10+, FastAPI, Uvicorn, WebSockets |
-| **AI & ML Pipeline** | Sarvam AI (STT/TTS), Groq LLM, WebRTCVAD, PyDantic |
-| **Database & Auth** | Supabase (PostgreSQL), Passlib (Bcrypt), Python-Jose |
-
----
-
-## 📁 Directory Structure
+## How It Works
 
 ```
-saral-ai/
-├── app/                        # Next.js frontend application pages and layouts
-│   ├── auth/                   # Authentication routes and callbacks
-│   ├── dashboard/              # Business admin portal and analytics
-│   ├── globals.css             # Global CSS styling and design tokens
-│   ├── layout.tsx              # Root HTML wrapper
-│   └── page.tsx                # Main landing page
-├── components/                 # Reusable UI components
-├── saral-ai-backend/           # FastAPI backend application
-│   ├── app/
-│   │   ├── api/                # REST endpoints and WebSocket call routers
-│   │   ├── core/               # Configuration and environment management
-│   │   ├── db/                 # Supabase client and database schemas
-│   │   ├── services/           # Integration clients (Sarvam, Groq, Fallback)
-│   │   ├── utils/              # Voice Activity Detection algorithms
-│   │   ├── workers/            # Background workers (daily digests, FAQ audit)
-│   │   └── main.py             # FastAPI entry point
-│   ├── requirements.txt        # Backend dependencies
-│   └── tests/                  # Backend testing suite
-├── architecture.md             # In-depth architectural specification
-└── DESIGN.md                   # Authoritative design tokens and system guidelines
+Caller voice → STT → AMD-hosted LLM reasoning → structured case + urgency
+extraction → TTS response → WhatsApp + dashboard
 ```
 
----
+1. A patient calls the clinic and speaks naturally in Hindi/Marathi/English
+2. Saral answers, asks follow-up questions, and responds using the clinic's configured knowledge base (timings, fees, doctor availability, policies)
+3. When the call ends, a second AI stage extracts structured intake data and classifies urgency
+4. The clinic receives a WhatsApp case card with the caller's details, complaint, urgency level, and recommended action
+5. The clinic dashboard shows call logs, case cards, and clinic configuration
 
-## 🚀 Getting Started
+## AMD / Fireworks Usage
+
+Saral AI runs two distinct AMD-hosted inference stages via Fireworks AI:
+
+- **Stage 1 (live conversation):** `deepseek-v4-flash` handles real-time conversational reasoning during the call, with full token streaming into text-to-speech for low-latency responses.
+- **Stage 2 (post-call triage):** `minimax-m3` runs after the call ends to perform structured patient intake extraction and urgency classification.
+
+Sarvam AI handles Hindi/Marathi/English text-to-speech, and Groq Whisper handles speech-to-text (chosen after direct comparison testing showed superior mixed-script Hindi/Hinglish transcription — see `docs/` for the comparison, if included).
+
+## Tech Stack
+
+- **Backend:** FastAPI (Python), WebSocket-based real-time voice pipeline
+- **Frontend:** Next.js (React, TypeScript)
+- **Database:** Supabase (Postgres)
+- **LLM Inference:** Fireworks AI (AMD-hosted) — deepseek-v4-flash + minimax-m3
+- **STT:** Groq Whisper (whisper-large-v3)
+- **TTS:** Sarvam AI (bulbul:v3)
+- **Notifications:** Twilio WhatsApp (free-form messaging)
+- **VAD:** webrtcvad with pre-speech rolling buffer
+
+## Features
+
+- Real-time multilingual voice conversation (Hindi/Marathi/English)
+- Clinic knowledge grounding (timings, doctor availability, fees, location, policies)
+- Structured intake extraction (name, complaint, urgency, requested slot, patient type)
+- Urgency/callback priority classification (urgent / same-day / routine / FAQ-only)
+- Automated WhatsApp case card delivery to clinic staff
+- Minimal clinic dashboard: call logs, case cards, FAQ/config
+- Clinic setup UI with WhatsApp number configuration and Saral activation toggle
+
+## Setup & Installation
 
 ### Prerequisites
 
-- Node.js 18+ and `npm` or `bun`
-- Python 3.10+
-- Active accounts and API keys for **Supabase**, **Sarvam AI**, and **Groq**
+- Python 3.11+
+- Node.js 18+
+- A Supabase project
+- API keys: Fireworks AI, Groq, Sarvam AI, Twilio
 
----
+### Backend
 
-### Backend Setup
+```bash
+cd saral-ai-backend
+pip install -r requirements.txt --break-system-packages
+cp .env.example .env
+# Fill in your API keys in .env
+uvicorn app.main:app
+```
 
-1. Navigate to the backend directory:
-   ```bash
-   cd saral-ai-backend
-   ```
+### Frontend
 
-2. Create and activate a Python virtual environment:
-   ```bash
-   python -m venv .venv
-   # Windows
-   .venv\Scripts\activate
-   # Linux/macOS
-   source .venv/bin/activate
-   ```
+```bash
+npm install
+npm run dev
+```
 
-3. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Environment Variables
 
-4. Configure environment variables. Copy `.env.example` to `.env` and fill in your credentials:
-   ```env
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_anon_or_service_key
-   SARVAM_API_KEY=your_sarvam_api_key
-   GROQ_API_KEY=your_groq_api_key
-   SECRET_KEY=your_jwt_secret_key
-   ```
+```
+FIREWORKS_API_KEY=
+FIREWORKS_MODEL=accounts/fireworks/models/deepseek-v4-flash
+GROQ_API_KEY=
+SARVAM_API_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+SUPABASE_URL=
+SUPABASE_KEY=
+```
 
-5. Run the development server:
-   ```bash
-   uvicorn app.main:app --reload --port 8000
-   ```
+### Docker
 
----
+```bash
+docker-compose up --build
+```
 
-### Frontend Setup
+## Usage
 
-1. Navigate to the root project directory:
-   ```bash
-   cd ..
-   ```
+1. Sign up / log in to the dashboard
+2. Configure your clinic: name, timings, doctor availability, fees, FAQ entries
+3. Add your WhatsApp number to receive case card notifications (Twilio Sandbox requires a one-time opt-in — send `join <sandbox-word>` to the Twilio WhatsApp number from your configured number)
+4. Toggle Saral to Active
+5. Test the voice agent via the live call interface
+6. Review call logs and case cards in the dashboard; case cards are also delivered automatically to your WhatsApp
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Known Limitations (Hackathon Scope)
 
-3. Configure environment variables in `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-   ```
+- Twilio WhatsApp integration uses the free Sandbox tier, which requires manual opt-in per recipient number (not production-grade WhatsApp Business API)
+- No real telephony/PSTN integration — the voice agent is demonstrated via a WebSocket-based test interface rather than a live phone number
+- STT fallback (Sarvam) is currently non-functional due to a quota issue on the trial account; Groq Whisper is the sole active STT provider
 
-4. Start the Next.js development server:
-   ```bash
-   npm run dev
-   ```
+## License
 
-5. Access the application in your browser at `http://localhost:3000`.
-
----
-
-## 🔁 Real-Time Voice Pipeline
-
-The voice call processing loop operates through the following stages:
-
-1. **Audio Ingestion**: Audio chunks are received over WebSocket (`/ws/call`).
-2. **Speech Detection**: Voice Activity Detector monitors audio frames for trailing silence (default threshold 600ms).
-3. **Transcription**: Sarvam AI converts speech audio to text output.
-4. **LLM Inference**: Groq processes customer queries with conversational context history.
-5. **Synthesis & Streaming**: Response text is converted back to speech stream and delivered to the client.
-
----
-
-## ⏰ Background Workers & Notifications
-
-Saral AI features native background tasks managed via FastAPI's lifespan scheduler to automate business notifications:
-
-- **Daily Digest Worker**: Triggers daily at **8:00 PM IST** to summarize that day's successful bookings and standard call inquiries, delivering a consolidated report to the business owner via WhatsApp.
-- **FAQ Verification Worker**: Scans the knowledge base daily for FAQ entries older than 30 days that haven't been verified. It flags them and sends a WhatsApp prompt for verification to ensure the AI receptionist works with fresh data.
-
----
-
-## 📊 Database Schema
-
-The core system schema maintained in PostgreSQL includes:
-
-- **`users`**: Business owner details, credentials, and configuration settings.
-- **`faqs`**: Custom facts, business operating hours, and service responses used by the LLM.
-- **`call_logs`**: Call metrics, duration logs, and generated transcript summaries.
-- **`leads`**: Parsed client leads containing contact info, budget, and urgency classifications.
-
----
-
-## 📈 Telemetry & Latency Diagnostics
-
-Saral AI monitors performance metrics per audio exchange to ensure low-latency performance:
-
-- `stt_ms`: Speech-to-Text latency and buffering overhead.
-- `llm_ms`: Groq inference duration.
-- `tts_ms`: Speech synthesis and WebSocket chunk delivery time.
-- `total_ms`: Round-trip execution time.
-
-Diagnostic telemetry logs are emitted in JSON format during active sessions for monitoring system performance.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
+Built for AMD Developer Hackathon Act II, July 2026.
