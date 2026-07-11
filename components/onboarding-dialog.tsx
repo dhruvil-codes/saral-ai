@@ -1,6 +1,8 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
+import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
 import {
   Mic,
   MessageSquareCode,
@@ -27,6 +29,8 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 // ── Step Configuration & Data Constants ──
 
@@ -114,7 +118,7 @@ function FeatureImageFallback({
   alt: string
   icon: React.ElementType
 }) {
-  const [hasError, setHasError] = useState(false)
+  const [hasError, setHasError] = useState(!src || src.includes("/onboarding/"))
 
   return (
     <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-muted/40 border border-border/60 flex items-center justify-center group shadow-xs">
@@ -385,23 +389,79 @@ export function HeadlessTipsStep() {
 export interface OnboardingDialogProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Called after the voice agent is successfully activated (final step). */
+  onComplete?: () => void
 }
 
 export function HeadlessOnboardingDemo({
   open = true,
   onOpenChange,
+  onComplete,
 }: OnboardingDialogProps) {
   const [currentStep, setCurrentStep] = useState(0)
+  const [isActivating, setIsActivating] = useState(false)
+  const supabase = useMemo(() => createClient(), [])
   const totalSteps = STEP_CONFIG.length
   const stepInfo = STEP_CONFIG[currentStep]
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep((prev) => prev + 1)
     } else {
-      onOpenChange?.(false)
+      setIsActivating(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        let token = session?.access_token
+        if (!token) {
+          toast.error("Not authenticated")
+          setIsActivating(false)
+          return
+        }
+
+        const makeSettingsRequest = (authToken: string) =>
+          fetch(`${BACKEND_URL}/api/auth/settings`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              saral_active: true,
+            }),
+          })
+
+        let res = await makeSettingsRequest(token)
+
+        // On 401, try refreshing the Supabase session (access token may have expired)
+        if (res.status === 401) {
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError || !refreshData.session?.access_token) {
+            toast.error("Session expired. Please log in again.")
+            window.location.href = "/login"
+            return
+          }
+          token = refreshData.session.access_token
+          res = await makeSettingsRequest(token)
+        }
+
+        if (res.ok) {
+          toast.success("Saral Voice Agent activated successfully!")
+          onComplete?.()
+          onOpenChange?.(false)
+        } else {
+          const errData = await res.json()
+          console.error("Failed to activate Saral Voice Agent", errData)
+          toast.error(`Error: ${errData.detail || "Failed to activate"}`)
+        }
+      } catch (err) {
+        console.error("Error activating Saral Voice Agent", err)
+        toast.error("An error occurred while activating Saral Voice Agent.")
+      } finally {
+        setIsActivating(false)
+      }
     }
   }
+
 
   const handleBack = () => {
     if (currentStep > 0) {
@@ -445,6 +505,7 @@ export function HeadlessOnboardingDemo({
               <Button
                 type="button"
                 variant="outline"
+                disabled={isActivating}
                 onClick={handleBack}
                 className="rounded-full font-sans text-xs px-4 h-9 gap-1"
               >
@@ -457,12 +518,13 @@ export function HeadlessOnboardingDemo({
           </div>
           <Button
             type="button"
+            disabled={isActivating}
             onClick={handleNext}
             className="rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-sans font-semibold text-xs px-5 h-9 gap-1.5 shadow-xs transition-colors"
           >
             {currentStep === totalSteps - 1 ? (
               <>
-                Launch Voice Agent
+                {isActivating ? "Activating..." : "Launch Voice Agent"}
                 <ArrowRight className="size-3.5" />
               </>
             ) : (
