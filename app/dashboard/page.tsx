@@ -49,7 +49,7 @@ const demoMetricCards = [
   },
   {
     title: "Avg. Latency",
-    value: "2.2s",
+    value: "7s",
     description: "Within optimal range",
     icon: Clock,
     trend: "neutral" as const,
@@ -278,8 +278,8 @@ export default function DashboardPage() {
         // Missed Calls
         const missedCalls = calls.filter((c) => c.status === "failed" || c.status === "missed").length;
 
-        // Avg Latency (2.2s if calls > 0, else waiting)
-        const latencyVal = calls.length > 0 ? "2.2s" : "—";
+        // Avg Latency (7s if calls > 0, else waiting)
+        const latencyVal = calls.length > 0 ? "7s" : "—";
         const latencyDesc = calls.length > 0 ? "Within optimal range" : "Waiting for first call";
 
         const updatedMetrics = [
