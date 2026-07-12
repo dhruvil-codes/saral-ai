@@ -10,6 +10,7 @@ import {
   LogOut,
   ChevronsUpDown,
   User2,
+  Bot,
 } from "lucide-react";
 import { SaralLogoMark } from "@/assets/logo/logo";
 import { createClient } from "@/utils/supabase/client";
@@ -53,6 +54,11 @@ const navItems = [
         title: "Clinic FAQ/Config",
         url: "/dashboard/faqs",
         icon: BookOpen,
+      },
+      {
+        title: "Agents",
+        url: "/dashboard/agents",
+        icon: Bot,
       },
     ],
   },
