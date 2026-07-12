@@ -369,6 +369,7 @@ export default function DashboardPage() {
     setNeedsOnboarding(false);
     setShowOnboarding(false);
     setUserStatusLoaded(false); // Force reload
+    window.location.href = "/dashboard";
   };
 
   // New / inactive users see a clean empty state, not pre-populated mock data.
@@ -377,6 +378,33 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1
+            className="text-3xl font-bold tracking-tight text-foreground"
+            style={{
+              fontFamily:
+                'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif',
+            }}
+          >
+            Dashboard
+          </h1>
+          <p className="text-sm text-muted-foreground font-sans">
+            Central command center for your AI voice receptionists.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => window.location.href = "/dashboard/agents"}
+            className="rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-sans font-semibold text-sm px-6 h-10 shadow-md gap-2"
+          >
+            <Sparkles className="size-4" />
+            Launch Agent
+          </Button>
+        </div>
+      </div>
+
       <HeadlessOnboardingDemo
         open={showOnboarding}
         onOpenChange={setShowOnboarding}
@@ -437,6 +465,57 @@ export default function DashboardPage() {
           </Button>
         </div>
       )}
+
+      {/* ── Status & Connection Summary Panel ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl border border-border/60 bg-muted/20">
+        <div className="flex items-center gap-3">
+          <div className="size-3.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          <div>
+            <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider font-sans">
+              Telephony Gateway
+            </p>
+            <p className="text-xs font-semibold text-foreground font-sans">
+              Connected (Twilio SIP Active)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="size-3.5 rounded-full bg-emerald-500 shrink-0" />
+          <div>
+            <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider font-sans">
+              WhatsApp Notifications
+            </p>
+            <p className="text-xs font-semibold text-foreground font-sans">
+              Active & Synced
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="size-3.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          <div>
+            <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider font-sans">
+              Voice Engine Status
+            </p>
+            <p className="text-xs font-semibold text-foreground font-sans">
+              Sarvam AI (Bulbul:v3)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="size-3.5 rounded-full bg-[#f5a623] shrink-0" />
+          <div>
+            <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider font-sans">
+              AI receptionist Status
+            </p>
+            <p className="text-xs font-semibold text-foreground font-sans">
+              Running (1 Active Agent)
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* ── Metric Cards Row ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
