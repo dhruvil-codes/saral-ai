@@ -1,13 +1,19 @@
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 import uuid
 from datetime import datetime
 
-# Setup database state mock
+# Setup database state mock with all tables to prevent cross-file leaks
 mock_db = {
     "users": [],
-    "faqs": []
+    "faqs": [],
+    "bookings": [],
+    "call_logs": [],
+    "settings": [],
+    "leads": []
 }
 
 class MockTable:
@@ -25,6 +31,9 @@ class MockTable:
 
     def eq(self, field, value):
         self._filters.append((field, value))
+        return self
+
+    def order(self, field, desc=False):
         return self
 
     def insert(self, data):
@@ -89,13 +98,24 @@ class MockSupabaseClient:
     def table(self, table_name):
         return MockTable(table_name)
 
-# Patch get_supabase before importing app to mock database interactions
+    def rpc(self, fn_name, params):
+        class MockResponse:
+            def __init__(self, data):
+                self.data = data
+        return MockResponse([])
+
+# Patch get_supabase and pwd_context before importing app to mock database and avoid passlib/bcrypt bug
+FAKE_HASH = "$2b$12$fakehashfornewuseronboardingtests00000000000000000000"
 with patch('app.db.supabase_client.get_supabase', return_value=MockSupabaseClient()):
-    from app.main import app
+    with patch("app.api.auth.pwd_context.hash", return_value=FAKE_HASH):
+        with patch("app.api.auth.pwd_context.verify", return_value=True):
+            from app.main import app
 
 client = TestClient(app)
 
-def test_faqs_flow():
+@patch("app.api.auth.pwd_context.hash", return_value=FAKE_HASH)
+@patch("app.api.auth.pwd_context.verify", return_value=True)
+def test_faqs_flow(mock_verify, mock_hash):
     print("Starting FAQ Endpoints Verification...")
 
     # ==========================================

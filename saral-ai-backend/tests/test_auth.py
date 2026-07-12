@@ -1,4 +1,6 @@
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import uuid
 from datetime import datetime
@@ -6,9 +8,14 @@ from unittest.mock import patch
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
-# Setup database state mock
+# Setup database state mock with all tables to prevent cross-file KeyError leaks
 mock_db = {
-    "users": []
+    "users": [],
+    "faqs": [],
+    "bookings": [],
+    "call_logs": [],
+    "settings": [],
+    "leads": []
 }
 
 class MockTable:
@@ -23,6 +30,9 @@ class MockTable:
 
     def eq(self, field, value):
         self._filters.append((field, value))
+        return self
+
+    def order(self, field, desc=False):
         return self
 
     def insert(self, data):
@@ -66,6 +76,12 @@ class MockTable:
 class MockSupabaseClient:
     def table(self, table_name):
         return MockTable(table_name)
+
+    def rpc(self, fn_name, params):
+        class MockResponse:
+            def __init__(self, data):
+                self.data = data
+        return MockResponse([])
 
 
 FAKE_HASH = "$2b$12$fakehashfornewuseronboardingtests00000000000000000000"

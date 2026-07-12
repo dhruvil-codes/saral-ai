@@ -6,7 +6,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 # Add app to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
 
@@ -14,6 +14,24 @@ class TestOptimizations(unittest.TestCase):
 
     def setUp(self):
         self.client = TestClient(app)
+        self.supabase_patcher = patch("app.db.supabase_client.get_supabase")
+        self.mock_get_supabase = self.supabase_patcher.start()
+        self.mock_client = MagicMock()
+        self.mock_get_supabase.return_value = self.mock_client
+        self.mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+        self.mock_client.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(data=[])
+        self.mock_client.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[])
+        self.mock_client.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[])
+
+    def tearDown(self):
+        self.supabase_patcher.stop()
+
+    def _consume_welcome(self, websocket, language="en-IN"):
+        welcome_text = "Hello! How can I help you today?" if language.startswith("en") else "नमस्ते! मैं आपकी क्या सहायता कर सकता हूँ?"
+        self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
+        self.assertEqual(websocket.receive_json(), {"status": "ai_text", "text": welcome_text})
+        websocket.receive_bytes()
+        self.assertEqual(websocket.receive_json(), {"status": "tts_end"})
 
     @patch("app.api.calls.get_supabase")
     def test_incoming_call_webhook(self, mock_get_supabase):
@@ -47,6 +65,7 @@ class TestOptimizations(unittest.TestCase):
         mock_cache.lookup.side_effect = mock_lookup
 
         with self.client.websocket_connect("/ws/call?language=en-IN") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             # Send audio bytes
             websocket.send_bytes(b"input-audio")
             
@@ -89,11 +108,12 @@ class TestOptimizations(unittest.TestCase):
         
         mock_llm.return_value = "We are located in Mumbai."
         
-        async def mock_stream(text, lang):
+        async def mock_stream(text, lang, *args, **kwargs):
             yield b"synthesized-audio"
         mock_tts_stream.side_effect = mock_stream
         
         with self.client.websocket_connect("/ws/call?user_id=test-user-123") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             websocket.send_bytes(b"input-audio")
             
             websocket.receive_json() # status: transcribed
@@ -140,11 +160,12 @@ class TestOptimizations(unittest.TestCase):
         
         mock_llm.return_value = "The entry fee is 500 rupees, but please verify with the owner."
         
-        async def mock_stream(text, lang):
+        async def mock_stream(text, lang, *args, **kwargs):
             yield b"synthesized-audio"
         mock_tts_stream.side_effect = mock_stream
         
         with self.client.websocket_connect("/ws/call?user_id=test-user-123") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             websocket.send_bytes(b"input-audio")
             websocket.receive_json() # status: transcribed
             websocket.receive_json() # status: tts_start

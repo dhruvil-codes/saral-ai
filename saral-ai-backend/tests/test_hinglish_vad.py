@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import httpx
 
 # Add current folder to sys.path so we can import app modules
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.utils.vad import VoiceActivityDetector
 from app.services.sarvam import speech_to_text

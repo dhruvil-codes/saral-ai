@@ -55,3 +55,8 @@ __pycache__/
 *.log
 query
 
+# Scratch and local test artifacts
+/saral-ai-backend/scratch/
+/saral-ai-backend/test_client.html
+/saral-ai-backend/test_voice_agent_local.py
+/saral-ai-backend/test_fireworks_*.py

@@ -7,7 +7,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 # Ensure backend app is in path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -24,7 +24,16 @@ sample_case_data = {
     "recommended_action": "callback_now"
 }
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_case_card():
+    # Check Twilio credentials, skip if not set
+    sid = os.getenv("TWILIO_ACCOUNT_SID")
+    token = os.getenv("TWILIO_AUTH_TOKEN")
+    if not sid or not token or sid == "placeholder-twilio-sid" or token == "placeholder-twilio-auth-token" or sid == "placeholder" or token == "placeholder":
+        pytest.skip("Twilio credentials not configured in environment")
+
     # Allow specifying destination via environment variable, fallback to default for placeholder simulation
     to_number = os.getenv("TEST_WHATSAPP_TO")
     if not to_number:

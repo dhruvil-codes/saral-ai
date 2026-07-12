@@ -9,7 +9,7 @@ import sys
 import json
 
 # Ensure backend root is in python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.stage2_triage import extract_case_summary
 

@@ -11,7 +11,7 @@ import httpx
 
 # Make sure we can import the app modules
 import sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.sarvam import speech_to_text, text_to_speech, text_to_speech_stream, _normalize_language_code
 from app.services.fireworks_llm import get_response
@@ -45,8 +45,8 @@ class TestServices(unittest.TestCase):
         }
         mock_client.return_value.__enter__.return_value.post.return_value = mock_response
 
-        # Execute with a dummy key set in env for test isolation
-        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key"}):
+        # Execute with a dummy key set in env for test isolation, clearing GROQ_API_KEY to force Sarvam path
+        with patch.dict(os.environ, {"SARVAM_API_KEY": "test-valid-key", "GROQ_API_KEY": ""}):
             transcript = speech_to_text(b"fake-audio-bytes", "en-US")
             self.assertEqual(transcript, "Hello world transcription")
             

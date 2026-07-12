@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 
 # Ensure backend app is in path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Define in-memory mock database state
 mock_db = {
@@ -14,7 +14,10 @@ mock_db = {
         {"id": "user-uuid-123", "email": "test@business.com", "whatsapp_number": "+919999999999"}
     ],
     "bookings": [],
-    "call_logs": []
+    "call_logs": [],
+    "faqs": [],
+    "settings": [],
+    "leads": []
 }
 
 class MockTable:
@@ -40,6 +43,9 @@ class MockTable:
 
     def gt(self, field, value):
         self._filters.append((field, value, "gt"))
+        return self
+
+    def order(self, field, desc=False):
         return self
 
     def insert(self, data):
@@ -125,6 +131,12 @@ class MockSupabaseClient:
     def table(self, table_name):
         return MockTable(table_name)
 
+    def rpc(self, fn_name, params):
+        class MockResponse:
+            def __init__(self, data):
+                self.data = data
+        return MockResponse([])
+
 # Patch get_supabase and Twilio calls before importing the app
 import app.db.supabase_client
 with patch('app.db.supabase_client.get_supabase', return_value=MockSupabaseClient()):
@@ -156,6 +168,13 @@ class TestResilienceFeatures(unittest.TestCase):
     def tearDown(self):
         for p in self.patchers:
             p.stop()
+
+    def _consume_welcome(self, websocket, language="en-IN"):
+        welcome_text = "Hello! How can I help you today?" if language.startswith("en") else "नमस्ते! मैं आपकी क्या सहायता कर सकता हूँ?"
+        self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
+        self.assertEqual(websocket.receive_json(), {"status": "ai_text", "text": welcome_text})
+        websocket.receive_bytes()
+        self.assertEqual(websocket.receive_json(), {"status": "tts_end"})
 
 
     def test_hold_and_confirm_booking_logic(self):
@@ -210,7 +229,7 @@ class TestResilienceFeatures(unittest.TestCase):
 
 
 
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"audio-chunk"
         mock_tts_stream.side_effect = mock_stream
 
@@ -219,6 +238,7 @@ class TestResilienceFeatures(unittest.TestCase):
         
         # Connect & disconnect to trigger finally block
         with client.websocket_connect(f"/ws/call?language=en-IN&call_id={call_id}&user_id={user_id}") as ws:
+            self._consume_welcome(ws, "en-IN")
             ws.send_bytes(b"dummy-audio")
             ws.receive_json() # status transcribed
             ws.receive_json() # status tts_start
