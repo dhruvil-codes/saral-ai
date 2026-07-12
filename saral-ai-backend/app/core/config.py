@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     RAG_TOP_N: int = 3
     RAG_SIMILARITY_THRESHOLD: float = 0.70
 
+    # CORS
+    ALLOWED_ORIGINS: str = "*"
+
     class Config:
         env_file = ".env"
         extra = "ignore"

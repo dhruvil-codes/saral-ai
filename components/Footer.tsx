@@ -1,58 +1,121 @@
-import React from 'react';
-import { SaralLogoMark } from '@/assets/logo/logo';
+"use client";
+
+import { SaralLogoMark } from "@/assets/logo/logo";
+import { LandingCTA } from "@/components/landing/primitives";
+
+const platformLinks = [
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Features", href: "#features" },
+  { label: "Product", href: "#product" },
+  { label: "Use cases", href: "#use-cases" },
+];
+
+const companyLinks = [
+  { label: "FAQ", href: "#faq" },
+  { label: "Integrations", href: "#integrations" },
+  { label: "Early access", href: "/login" },
+];
 
 export default function Footer() {
-    return (
-        <>
-            <style>
-                {`
-                    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
-                    .saral-footer-text {
-                        font-family: "Geist", sans-serif;
-                    }
-                `}
-            </style>
-            <div className='bg-[var(--color-surface-alt)] pt-20 px-4 saral-footer-text'>
-                <footer className="bg-white w-full max-w-[1350px] mx-auto text-black pt-8 lg:pt-12 px-4 sm:px-8 md:px-16 lg:px-28 rounded-tl-3xl rounded-tr-3xl overflow-hidden">
-                    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-6 gap-8 md:gap-12">
-                        
-                        <div className="lg:col-span-3 space-y-6">
-                            {/* Saral AI Logo SVG or Text */}
-                            <a href="/" className="inline-flex items-center gap-2.5">
-                                <SaralLogoMark size={32} />
-                                <h2 className="text-2xl font-bold tracking-tight font-display text-neutral-900" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>Saral AI</h2>
-                            </a>
-                            <p className="text-sm/6 text-neutral-600 max-w-96">
-                                Saral AI provides zero-friction voice automation and instant WhatsApp lead capture to ensure Indian businesses never miss a customer again.
-                            </p>
-                        </div>
-
-                        <div className="lg:col-span-3 flex lg:justify-end items-start">
-                            {/* Platform */}
-                            <div>
-                                <h3 className="font-bold text-base mb-4 text-neutral-900 font-display" style={{ fontFamily: 'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif' }}>Platform</h3>
-                                <ul className="space-y-3 text-sm text-neutral-800">
-                                    <li><a href="#" className="hover:text-neutral-700">Voice Engine</a></li>
-                                    <li><a href="#" className="hover:text-neutral-700">Dashboard</a></li>
-                                    <li><a href="#" className="hover:text-neutral-700">Integrations</a></li>
-                                    <li><a href="#" className="hover:text-neutral-700">Pricing</a></li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="max-w-7xl mx-auto mt-12 pt-4 border-t border-neutral-300 flex justify-between items-center z-10 relative">
-                        <p className="text-neutral-600 text-sm">© 2026 Saral AI</p>
-                        <p className='text-sm text-neutral-600'>All rights reserved.</p>
-                    </div>
-                    <div className="relative">
-                        <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-64 bg-slate-100 rounded-full blur-[100px] pointer-events-none"/>
-                        <h1 className="text-center font-extrabold leading-[0.7] text-transparent text-[clamp(3rem,15vw,15rem)] [-webkit-text-stroke:1px_#D4D4D4] mt-6 relative z-0 font-sans">
-                            SARAL AI
-                        </h1>
-                    </div>
-                </footer>
+  return (
+    <footer className="pt-8 md:pt-12 px-4 md:px-8 pb-0">
+      <div className="bg-white/90 backdrop-blur-sm w-full max-w-[1120px] mx-auto rounded-t-[28px] border border-b-0 border-white overflow-hidden shadow-[0_0_0_1px_rgba(186,220,245,0.35),0_0_0_6px_rgba(186,220,245,0.2)]">
+        <div className="px-6 sm:px-10 lg:px-12 pt-10 lg:pt-12 pb-8">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8">
+            <div className="md:col-span-5 space-y-5">
+              <a href="/" className="inline-flex items-center gap-2.5 group">
+                <SaralLogoMark size={32} />
+                <span
+                  className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]"
+                  style={{
+                    fontFamily:
+                      'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif',
+                  }}
+                >
+                  Saral AI
+                </span>
+              </a>
+              <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] max-w-sm">
+                Multilingual voice intake for Indian clinics. Every call answered,
+                every lead on WhatsApp.
+              </p>
+              <LandingCTA href="/login" className="!py-3 !px-6 !text-sm">
+                Get Early Access
+              </LandingCTA>
             </div>
-        </>
-    )
+
+            <div className="md:col-span-3 md:col-start-7">
+              <h3
+                className="text-base font-bold text-[var(--color-text-primary)] mb-4"
+                style={{
+                  fontFamily:
+                    'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif',
+                }}
+              >
+                Platform
+              </h3>
+              <ul className="space-y-3 text-sm text-[var(--color-text-secondary)]">
+                {platformLinks.map((l) => (
+                  <li key={l.label}>
+                    <a
+                      href={l.href}
+                      className="hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="md:col-span-3">
+              <h3
+                className="text-base font-bold text-[var(--color-text-primary)] mb-4"
+                style={{
+                  fontFamily:
+                    'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif',
+                }}
+              >
+                Company
+              </h3>
+              <ul className="space-y-3 text-sm text-[var(--color-text-secondary)]">
+                {companyLinks.map((l) => (
+                  <li key={l.label}>
+                    <a
+                      href={l.href}
+                      className="hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-10 pt-5 border-t border-[var(--color-border-strong)] flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p className="text-sm text-[var(--color-text-muted)]">
+              © 2026 Saral AI. All rights reserved.
+            </p>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Voice AI for Indian clinics
+            </p>
+          </div>
+        </div>
+
+        <div className="relative px-4 overflow-hidden select-none" aria-hidden>
+          <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-2xl h-24 bg-[rgba(186,220,245,0.35)] rounded-full blur-[60px] pointer-events-none" />
+          <p
+            className="text-center font-bold leading-[0.75] text-transparent text-[clamp(2.5rem,12vw,10rem)] [-webkit-text-stroke:1px_#c5dff0] relative z-0 tracking-tight"
+            style={{
+              fontFamily:
+                'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif',
+            }}
+          >
+            SARAL
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
 }

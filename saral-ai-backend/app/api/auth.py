@@ -199,6 +199,8 @@ class SettingsUpdateRequest(BaseModel):
     saral_active: Optional[bool] = None
     vad_threshold_ms: Optional[int] = None
     notification_preference: Optional[str] = None
+    system_prompt: Optional[str] = None
+    voice_id: Optional[str] = None
 
 @router.put("/settings")
 async def update_settings(
@@ -224,6 +226,10 @@ async def update_settings(
                 detail="Invalid notification preference. Must be 'all', 'urgent_only', or 'digest'."
             )
         update_data["notification_preference"] = val
+    if body.system_prompt is not None:
+        update_data["system_prompt"] = body.system_prompt
+    if body.voice_id is not None:
+        update_data["voice_id"] = body.voice_id
 
     if not update_data:
         raise HTTPException(
@@ -248,7 +254,9 @@ async def update_settings(
                 "whatsapp_number": updated_user.get("whatsapp_number"),
                 "saral_active": updated_user.get("saral_active", True),
                 "vad_threshold_ms": updated_user.get("vad_threshold_ms", 1000),
-                "notification_preference": updated_user.get("notification_preference", "urgent_only")
+                "notification_preference": updated_user.get("notification_preference", "urgent_only"),
+                "system_prompt": updated_user.get("system_prompt"),
+                "voice_id": updated_user.get("voice_id", "shruti")
             }
         }
     except Exception as e:

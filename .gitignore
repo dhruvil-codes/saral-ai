@@ -51,3 +51,7 @@ __pycache__/
 .pytest_cache/
 .cache/
 
+# local logs and queries
+*.log
+query
+

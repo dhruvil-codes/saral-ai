@@ -2,19 +2,21 @@
 
 import ScrollObserver from "../components/ScrollObserver";
 import Navbar from "../components/shadcn-space/blocks/navbar-01/navbar";
-import {
-  StepCallIllustration,
-  StepAnswerIllustration,
-  StepSummaryIllustration,
-} from "../components/LineArt";
-import ProblemFeatures from "../components/ui/problem-features";
-import { Megaphone, Clock, UserX } from "lucide-react";
-import FeatureGrid from "../components/FeatureGrid";
 import Footer from "../components/Footer";
+import {
+  ProblemSection,
+  HowItWorks,
+  FeaturesBento,
+  ProductShowcase,
+  UseCases,
+  Integrations,
+  FAQSection,
+  FinalCTA,
+} from "../components/landing";
 
 export default function Home() {
   return (
-    <main className="landing-page min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased select-none font-sans overflow-x-hidden">
+    <main className="landing-page min-h-screen bg-[#e8f3fb] text-[var(--color-text-primary)] antialiased select-none font-sans overflow-x-hidden">
       {/* Client-side scroll observer & metrics count-up triggers */}
       <ScrollObserver />
 
@@ -167,49 +169,18 @@ export default function Home() {
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent via-[var(--color-surface-alt)]/70 to-[var(--color-surface-alt)] pointer-events-none z-0" />
       </section>
 
-      {/* 3. Problem Section (bg: --color-surface-alt) */}
-      <section id="problem" className="py-16 md:py-24 bg-[var(--color-surface-alt)] border-b border-[var(--color-border)] relative">
-        <div className="max-w-[1160px] mx-auto px-4 md:px-8">
-          <div className="text-center max-w-[640px] mx-auto mb-16">
-            <span className="t-label text-[var(--color-accent)] mb-3 block tracking-widest font-semibold">
-              THE PROBLEM
-            </span>
-            <h2 className="t-section-heading text-[var(--color-text-primary)] mb-5">
-              You&apos;re losing customers between rings
-            </h2>
-            <p className="t-body-lead text-[var(--color-text-secondary)]">
-              Every missed call is a customer who goes to your competitor. Small businesses in India lose up to 40% of inbound inquiries simply because no one answered.
-            </p>
-          </div>
-
-          {/* Aceternity-style interactive features section */}
-          <ProblemFeatures
-            features={[
-              {
-                title: "Ad Waste",
-                description: "Running meta ads but missing the calls they generate.",
-                icon: <Megaphone className="w-5.5 h-5.5" strokeWidth={1.5} />,
-              },
-              {
-                title: "In-Moment Friction",
-                description: "Busy with actual work when customers call.",
-                icon: <Clock className="w-5.5 h-5.5" strokeWidth={1.5} />,
-              },
-              {
-                title: "Capacity Limits",
-                description: "No staff to manage incoming queries 24/7.",
-                icon: <UserX className="w-5.5 h-5.5" strokeWidth={1.5} />,
-              },
-            ]}
-          />
-        </div>
-      </section>
-
-      {/* 4. Core Architecture Features Grid */}
-      <FeatureGrid />
-
-      {/* 6. Footer */}
-      <Footer />
+      {/* ── Below-hero: continuous sky canvas + soft cards ── */}
+      <div className="landing-below-hero">
+        <ProblemSection />
+        <HowItWorks />
+        <FeaturesBento />
+        <ProductShowcase />
+        <UseCases />
+        <Integrations />
+        <FAQSection />
+        <FinalCTA />
+        <Footer />
+      </div>
     </main>
   );
 }

@@ -15,4 +15,8 @@ python-jose[cryptography]
 python-multipart
 pg8000
 webrtcvad-wheels
+sentence-transformers
+numpy
+psycopg2-binary
+
 

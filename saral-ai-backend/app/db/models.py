@@ -108,6 +108,8 @@ class User(BaseModel):
     saral_active: Optional[bool] = True
     vad_threshold_ms: Optional[int] = 1000
     notification_preference: Optional[str] = "urgent_only"
+    system_prompt: Optional[str] = None
+    voice_id: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -120,6 +122,8 @@ class UserResponse(BaseModel):
     saral_active: Optional[bool] = True
     vad_threshold_ms: Optional[int] = 1000
     notification_preference: Optional[str] = "urgent_only"
+    system_prompt: Optional[str] = None
+    voice_id: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -139,6 +143,7 @@ class FAQ(BaseModel):
 class CallLog(BaseModel):
     id: UUID
     user_id: UUID
+    agent_id: Optional[UUID] = None
     caller_number: str
     transcript: Optional[str] = None
     summary: Optional[str] = None
@@ -152,6 +157,7 @@ class Lead(BaseModel):
     id: UUID
     call_log_id: Optional[UUID] = None
     user_id: UUID
+    agent_id: Optional[UUID] = None
     caller_number: str
     name: Optional[str] = None
     interest: Optional[str] = None
@@ -182,6 +188,47 @@ class Booking(BaseModel):
     status: str
     expires_at: Optional[datetime] = None
     call_id: Optional[UUID] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class Agent(BaseModel):
+    id: UUID
+    user_id: UUID
+    name: str
+    system_prompt: Optional[str] = None
+    voice_id: Optional[str] = "shruti"
+    status: str = "Draft"
+    languages: list[str] = ["en-IN", "hi-IN"]
+    working_hours: Optional[dict] = None
+    appointment_duration: Optional[int] = 30
+    escalation_rules: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AgentResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    name: str
+    system_prompt: Optional[str] = None
+    voice_id: Optional[str] = "shruti"
+    status: str
+    languages: list[str]
+    working_hours: Optional[dict] = None
+    appointment_duration: Optional[int] = 30
+    escalation_rules: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AgentPromptVersion(BaseModel):
+    id: UUID
+    agent_id: UUID
+    prompt: str
+    version: int
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
