@@ -44,6 +44,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 type FAQ = {
   id: string;
   question: string;
@@ -151,7 +153,7 @@ export default function FaqsPage() {
           return;
         }
 
-        const res = await fetch("http://localhost:8000/api/faqs", {
+        const res = await fetch(`${BACKEND_URL}/api/faqs`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -187,7 +189,7 @@ export default function FaqsPage() {
       const token = session?.access_token;
       
       if (token) {
-        const res = await fetch("http://localhost:8000/api/faqs", {
+        const res = await fetch(`${BACKEND_URL}/api/faqs`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -240,7 +242,7 @@ export default function FaqsPage() {
       
       // Real UUID has length > 10
       if (token && editingFaq.id.length > 10) {
-        const res = await fetch(`http://localhost:8000/api/faqs/${editingFaq.id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/faqs/${editingFaq.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -301,7 +303,7 @@ export default function FaqsPage() {
       const token = session?.access_token;
       
       if (token && id.length > 10) {
-        const res = await fetch(`http://localhost:8000/api/faqs/${id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/faqs/${id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
