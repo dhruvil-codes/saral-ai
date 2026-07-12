@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
-import { Mic, MicOff, Phone, PhoneOff, Wifi, WifiOff } from "lucide-react";
+import { useRef, useState, useEffect, useCallback, Suspense } from "react";
+import { Mic, MicOff, Phone, PhoneOff, Wifi, WifiOff, Play, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client";
+import { useSearchParams } from "next/navigation";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -169,11 +174,88 @@ function downsampleBuffer(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TestAgentPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#f5a623]" />
+      </div>
+    }>
+      <TestAgentConsoleContent />
+    </Suspense>
+  );
+}
+
+function TestAgentConsoleContent() {
+  const searchParams = useSearchParams();
+  const agentId = searchParams.get("agent_id") || "";
+
   // ── UI state ──────────────────────────────────────────────────────────────
   const [status, setStatus] = useState<CallStatus>("idle");
-  const [wsUrl, setWsUrl] = useState("ws://127.0.0.1:8000/ws/call");
+  const [wsUrl, setWsUrl] = useState(() => {
+    const base = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000")
+      .replace(/^https:\/\//, "wss://")
+      .replace(/^http:\/\//, "ws://");
+    return `${base}/ws/call`;
+  });
   const [language, setLanguage] = useState("en-IN");
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [userId, setUserId] = useState<string>("");
+  const [testPhoneNumber, setTestPhoneNumber] = useState<string>("");
+  
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function loadUserSession() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          setUserId(session.user.id);
+          
+          // Let's also fetch their WhatsApp number to pre-populate as default
+          const token = session.access_token;
+          const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user && data.user.whatsapp_number) {
+              setTestPhoneNumber(data.user.whatsapp_number);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load user session/settings for test agent", err);
+      }
+    }
+    loadUserSession();
+  }, [supabase]);
+
+  const [aiState, setAiState] = useState<string>("Listening");
+  const [callDuration, setCallDuration] = useState<number>(0);
+  const [telemetryLogs, setTelemetryLogs] = useState<any[]>([]);
+
+  const isCallActive =
+    status === "connected" ||
+    status === "listening" ||
+    status === "ai_speaking";
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isCallActive) {
+      interval = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+      setAiState("Listening");
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isCallActive]);
+
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [totalBytesSent, setTotalBytesSent] = useState(0);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -604,6 +686,144 @@ export default function TestAgentPage() {
     }
   }, [addLog]);
 
+  const handleServerMessage = useCallback(async (event: MessageEvent) => {
+    if (typeof event.data === "string") {
+      try {
+        const data = JSON.parse(event.data) as Record<string, any>;
+
+        if (data.status === "state_change") {
+          setAiState(String(data.state));
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "state",
+              message: `AI shifted state to: ${data.state}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "latency") {
+          setLatencyMs(Number(data.latency_ms));
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "latency",
+              message: `Turn Latency logged: ${data.latency_ms} ms`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "rag_retrieval") {
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "rag",
+              message: `RAG search for "${data.queries}" matched FAQs: ${data.matches?.join(", ") || "none"}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "tool_call") {
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "tool_call",
+              message: `Tool executing: ${data.name} with args: ${typeof data.args === "object" ? JSON.stringify(data.args) : data.args}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "tool_result") {
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "tool_result",
+              message: `Tool returned: ${typeof data.result === "object" ? JSON.stringify(data.result) : data.result}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "booking_event") {
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "booking",
+              message: `Booking outcome: [${data.type.toUpperCase()}] ${data.details}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "transcribed") {
+          const text = String(data.text ?? "");
+          addLog("user", text);
+          stoppedSpeakingTimeRef.current = performance.now();
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "stt",
+              message: `User speech transcribed: "${text}"`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.status === "tts_start") {
+          isAISpeakingRef.current = true;
+          setStatus("ai_speaking");
+          setAiState("Speaking");
+          addLog("debug", "TTS stream starting…");
+          await initStreamingPlayback();
+        } else if (data.status === "tts_end") {
+          addLog("debug", "TTS stream complete.");
+          finishStreamingPlayback();
+          setAiState("Listening");
+        } else if (data.status === "ai_text") {
+          const text = String(data.text ?? "");
+          setLogs((prev) => {
+            if (prev.length > 0 && prev[prev.length - 1].level === "ai") {
+              const lastLog = prev[prev.length - 1];
+              // Append to the last AI log with a space
+              const updatedLast = {
+                ...lastLog,
+                message: lastLog.message.endsWith(" ") ? lastLog.message + text : lastLog.message + " " + text
+              };
+              return [...prev.slice(0, -1), updatedLast];
+            } else {
+              const now = new Date();
+              const ts = `${now.getHours().toString().padStart(2, "0")}:${now
+                .getMinutes()
+                .toString()
+                .padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}.${now
+                .getMilliseconds()
+                .toString()
+                .padStart(3, "0")}`;
+              const id = `${now.getTime()}-${Math.random().toString(36).substring(2, 9)}`;
+              return [...prev, { id, ts, level: "ai" as const, message: text }];
+            }
+          });
+        } else if (data.cache_hit) {
+          addLog("debug", "Semantic cache HIT — serving cached response.");
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "cache",
+              message: "Semantic cache HIT — serving cached response.",
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else if (data.error) {
+          addLog("error", `Server error: ${String(data.error)}`);
+          setTelemetryLogs((prev) => [
+            ...prev,
+            {
+              type: "error",
+              message: `Server reported error: ${data.error}`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else {
+          addLog("debug", `Server JSON: ${JSON.stringify(data)}`);
+        }
+      } catch {
+        addLog("debug", `Raw text message: ${event.data}`);
+      }
+    } else if (event.data instanceof ArrayBuffer) {
+      handleTTSChunk(event.data);
+    }
+  }, [addLog, initStreamingPlayback, finishStreamingPlayback, handleTTSChunk]);
+
   // ── PCM accumulation buffer across processor callbacks ───────────────────
   const pcmAccumRef = useRef<Int16Array[]>([]);
 
@@ -783,7 +1003,26 @@ export default function TestAgentPage() {
     };
 
     // 5. Open WebSocket
-    const fullUrl = `${wsUrl}?language=${language}`;
+    if (testPhoneNumber.trim()) {
+      const phoneRegex = /^\+[1-9]\d{1,14}$/;
+      if (!phoneRegex.test(testPhoneNumber.trim())) {
+        addLog("error", "Invalid test phone number. Must be in E.164 format, e.g. +919999999999");
+        toast.error("Invalid test phone number format");
+        setStatus("idle");
+        // cleanup
+        stream.getTracks().forEach((t) => t.stop());
+        await audioCtx.close();
+        return;
+      }
+    }
+
+    const queryParams = new URLSearchParams({
+      language,
+      ...(userId ? { user_id: userId } : {}),
+      ...(testPhoneNumber ? { caller_number: testPhoneNumber } : {}),
+      ...(agentId ? { agent_id: agentId } : {}),
+    });
+    const fullUrl = `${wsUrl}?${queryParams.toString()}`;
     let ws: WebSocket;
     try {
       ws = new WebSocket(fullUrl);
@@ -805,38 +1044,7 @@ export default function TestAgentPage() {
       drawVisualizer();
     };
 
-    ws.onmessage = async (event: MessageEvent) => {
-      if (typeof event.data === "string") {
-        try {
-          const data = JSON.parse(event.data) as Record<string, unknown>;
-
-          if (data.status === "transcribed") {
-            const text = String(data.text ?? "");
-            addLog("user", text);
-            stoppedSpeakingTimeRef.current = performance.now();
-            addLog("debug", "Utterance transmitted. Awaiting AI response…");
-          } else if (data.status === "tts_start") {
-            isAISpeakingRef.current = true;
-            setStatus("ai_speaking");
-            addLog("ai", "TTS stream starting…");
-            await initStreamingPlayback();
-          } else if (data.status === "tts_end") {
-            addLog("ai", "TTS stream complete.");
-            finishStreamingPlayback();
-          } else if (data.cache_hit) {
-            addLog("debug", "Semantic cache HIT — serving cached response.");
-          } else if (data.error) {
-            addLog("error", `Server error: ${String(data.error)}`);
-          } else {
-            addLog("debug", `Server JSON: ${JSON.stringify(data)}`);
-          }
-        } catch {
-          addLog("debug", `Raw text message: ${event.data}`);
-        }
-      } else if (event.data instanceof ArrayBuffer) {
-        handleTTSChunk(event.data);
-      }
-    };
+    ws.onmessage = handleServerMessage;
 
     ws.onclose = (e) => {
       addLog("system", `WebSocket closed. Code: ${e.code}, reason: ${e.reason || "none"}`);
@@ -1003,7 +1211,24 @@ export default function TestAgentPage() {
     processor.connect(audioCtx.destination);
 
     // 5. Open WebSocket
-    const fullUrl = `${wsUrl}?language=${language}`;
+    if (testPhoneNumber.trim()) {
+      const phoneRegex = /^\+[1-9]\d{1,14}$/;
+      if (!phoneRegex.test(testPhoneNumber.trim())) {
+        addLog("error", "Invalid test phone number. Must be in E.164 format, e.g. +919999999999");
+        toast.error("Invalid test phone number format");
+        setStatus("idle");
+        await audioCtx.close();
+        return;
+      }
+    }
+
+    const queryParams = new URLSearchParams({
+      language,
+      ...(userId ? { user_id: userId } : {}),
+      ...(testPhoneNumber ? { caller_number: testPhoneNumber } : {}),
+      ...(agentId ? { agent_id: agentId } : {}),
+    });
+    const fullUrl = `${wsUrl}?${queryParams.toString()}`;
     let ws: WebSocket;
     try {
       ws = new WebSocket(fullUrl);
@@ -1067,35 +1292,7 @@ export default function TestAgentPage() {
       };
     };
 
-    ws.onmessage = async (event: MessageEvent) => {
-      if (typeof event.data === "string") {
-        try {
-          const data = JSON.parse(event.data) as Record<string, unknown>;
-          if (data.status === "transcribed") {
-            const text = String(data.text ?? "");
-            addLog("user", text);
-            stoppedSpeakingTimeRef.current = performance.now();
-            addLog("debug", "Utterance transmitted. Awaiting AI response…");
-          } else if (data.status === "tts_start") {
-            isAISpeakingRef.current = true;
-            setStatus("ai_speaking");
-            addLog("ai", "TTS stream starting…");
-            await initStreamingPlayback();
-          } else if (data.status === "tts_end") {
-            addLog("ai", "TTS stream complete.");
-            finishStreamingPlayback();
-          } else if (data.cache_hit) {
-            addLog("debug", "Semantic cache HIT — serving cached response.");
-          } else if (data.error) {
-            addLog("error", `Server error: ${String(data.error)}`);
-          }
-        } catch {
-          addLog("debug", `Raw text message: ${event.data}`);
-        }
-      } else if (event.data instanceof ArrayBuffer) {
-        handleTTSChunk(event.data);
-      }
-    };
+    ws.onmessage = handleServerMessage;
 
     ws.onclose = (e) => {
       addLog("system", `WebSocket closed. Code: ${e.code}, reason: ${e.reason || "none"}`);
@@ -1169,52 +1366,50 @@ export default function TestAgentPage() {
   }, [stopVisualizer]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const isCallActive =
-    status === "connected" ||
-    status === "listening" ||
-    status === "ai_speaking";
 
   const statusMeta = STATUS_META[status];
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{
-            fontFamily:
-              'var(--font-heading), "ITC Garamond Book Narrow", Georgia, serif',
-            fontWeight: 700,
-          }}
-        >
-          Test Your Agent
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground font-sans">
-          Live browser-based voice testing portal. Connects directly to your
-          FastAPI WebSocket engine.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1
+            className="text-3xl font-bold tracking-tight text-foreground"
+            style={{
+              fontFamily:
+                'var(--font-garamond), "ITC Garamond Book Narrow", Georgia, serif',
+            }}
+          >
+            Developer Voice Console
+          </h1>
+          <p className="text-xs text-muted-foreground font-sans mt-0.5">
+            Real-time sandbox testing environment. Monitor live transcripts, tool calls, and RAG contexts.
+          </p>
+        </div>
+        {agentId && (
+          <Badge className="bg-[#f5a623]/10 text-black border border-[#f5a623]/30 px-3 py-1 text-xs font-semibold rounded-full font-sans">
+            Testing Agent: {agentId.slice(0, 8)}...
+          </Badge>
+        )}
       </div>
 
-      {/* ── Connection Config ────────────────────────────────────────────── */}
-      <Card className="border border-border/60 rounded-xl bg-card shadow-none">
-        <CardHeader className="px-5 pt-5 pb-3">
-          <CardTitle className="text-sm font-semibold text-foreground font-sans">
-            Connection Settings
-          </CardTitle>
-          <CardDescription className="text-xs text-muted-foreground font-sans">
-            Configure the WebSocket endpoint before starting a call.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-5 pb-5">
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-4">
+      {/* ── 3-Column Developer Terminal Layout ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* ── Column 1: Controls & Status ── */}
+        <div className="flex flex-col gap-6">
+          {/* Connection Settings Card */}
+          <Card className="border border-border/60 rounded-xl bg-card shadow-none">
+            <CardHeader className="px-5 pt-5 pb-3">
+              <CardTitle className="text-sm font-semibold text-foreground font-sans">
+                Sandbox Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label
-                  htmlFor="ws-url"
-                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
-                >
+                <Label htmlFor="ws-url" className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide">
                   WebSocket URL
                 </Label>
                 <Input
@@ -1222,40 +1417,52 @@ export default function TestAgentPage() {
                   value={wsUrl}
                   onChange={(e) => setWsUrl(e.target.value)}
                   disabled={isCallActive || status === "connecting"}
-                  className="font-mono text-sm h-9 rounded-lg border-border/70 bg-background"
-                  placeholder="ws://localhost:8000/ws/call"
+                  className="font-mono text-xs h-9 rounded-lg border-border/70 bg-background"
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label
-                  htmlFor="ws-lang"
-                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
-                >
-                  Language
-                </Label>
-                <select
-                  id="ws-lang"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  disabled={isCallActive || status === "connecting"}
-                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {LANGUAGE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="ws-lang" className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide">
+                    Language
+                  </Label>
+                  <select
+                    id="ws-lang"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    disabled={isCallActive || status === "connecting"}
+                    className="h-9 rounded-lg border border-border/70 bg-background px-3 text-xs font-sans"
+                  >
+                    {LANGUAGE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="ws-mic-boost" className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide">
+                    Mic Boost
+                  </Label>
+                  <select
+                    id="ws-mic-boost"
+                    value={micBoost}
+                    onChange={(e) => setMicBoost(e.target.value)}
+                    disabled={isCallActive || status === "connecting"}
+                    className="h-9 rounded-lg border border-border/70 bg-background px-3 text-xs font-sans"
+                  >
+                    <option value="auto">Auto-Boost (Recommended)</option>
+                    <option value="1">1x (No Boost)</option>
+                    <option value="10">10x</option>
+                    <option value="100">100x</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-1.5">
-                <Label
-                  htmlFor="ws-mic"
-                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
-                >
-                  Microphone Input Device
+                <Label htmlFor="ws-mic" className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide">
+                  Input Device
                 </Label>
                 <select
                   id="ws-mic"
@@ -1263,14 +1470,14 @@ export default function TestAgentPage() {
                   onChange={(e) => setSelectedDeviceId(e.target.value)}
                   onFocus={refreshDevices}
                   disabled={isCallActive || status === "connecting"}
-                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-xs font-sans text-ellipsis overflow-hidden"
                 >
                   {devices.length === 0 ? (
-                    <option value="">Default System Microphone</option>
+                    <option value="">Default Microphone</option>
                   ) : (
                     devices.map((device) => (
                       <option key={device.deviceId} value={device.deviceId}>
-                        {device.label || `Microphone ${device.deviceId.slice(0, 5)}...`}
+                        {device.label || `Mic ${device.deviceId.slice(0, 5)}...`}
                       </option>
                     ))
                   )}
@@ -1278,271 +1485,209 @@ export default function TestAgentPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label
-                  htmlFor="ws-mic-boost"
-                  className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide"
-                >
-                  Microphone Boost
+                <Label htmlFor="test-phone" className="text-xs font-semibold text-muted-foreground font-sans uppercase tracking-wide">
+                  Test Phone / WhatsApp Number
                 </Label>
-                <select
-                  id="ws-mic-boost"
-                  value={micBoost}
-                  onChange={(e) => setMicBoost(e.target.value)}
+                <Input
+                  id="test-phone"
+                  value={testPhoneNumber}
+                  onChange={(e) => setTestPhoneNumber(e.target.value)}
                   disabled={isCallActive || status === "connecting"}
-                  className="h-9 rounded-lg border border-border/70 bg-background px-3 text-sm font-sans text-foreground outline-none focus:ring-2 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="auto">Auto-Boost (Recommended)</option>
-                  <option value="1">1x (No Boost)</option>
-                  <option value="10">10x Boost</option>
-                  <option value="100">100x Boost</option>
-                  <option value="500">500x Boost</option>
-                  <option value="1000">1000x Boost</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Call Control Card ────────────────────────────────────────────── */}
-      <Card className="border border-border/60 rounded-xl bg-card shadow-none">
-        <CardContent className="p-5 flex flex-col gap-5">
-          {/* Status Bar */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-lg border border-border/60 bg-background">
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`inline-block size-2 rounded-full shrink-0 ${statusMeta.dotColor} ${
-                  status === "listening" || status === "ai_speaking"
-                    ? "animate-pulse"
-                    : ""
-                }`}
-              />
-              <span
-                className={`text-sm font-semibold font-sans ${statusMeta.color}`}
-              >
-                {statusMeta.label}
-              </span>
-            </div>
-            {latencyMs !== null && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground font-sans">
-                  Last latency:
-                </span>
-                <Badge className="text-xs font-medium bg-[#f0fdf4] text-[#16a34a] border border-[#bbf7d0] rounded-full px-2 py-0.5">
-                  {latencyMs} ms
-                </Badge>
-              </div>
-            )}
-          </div>
-
-          {/* Waveform Visualizer */}
-          <div className="relative h-20 rounded-lg border border-border/60 bg-[#f5f5f0] overflow-hidden">
-            {!isCallActive && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-xs text-muted-foreground font-sans font-medium">
-                  Waveform Visualizer
+                  className="text-xs h-9 rounded-lg border-border/70 bg-background"
+                  placeholder="e.g. +919999999999"
+                />
+                <span className="text-[10px] text-muted-foreground font-sans leading-normal">
+                  Alert logs, appointments and Stage 2 notifications will be routed here.
                 </span>
               </div>
-            )}
-            <canvas ref={canvasRef} className="w-full h-full block" />
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Stats Row */}
-          {isCallActive && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-background border border-border/60">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-sans">
-                  Audio Sent
-                </span>
-                <span className="text-sm font-semibold font-sans text-foreground">
-                  {totalBytesSent >= 1024
-                    ? `${(totalBytesSent / 1024).toFixed(1)} KB`
-                    : `${totalBytesSent} B`}
-                </span>
+          {/* Call Control Card */}
+          <Card className="border border-border/60 rounded-xl bg-card shadow-none">
+            <CardContent className="p-5 flex flex-col gap-4">
+              {/* Telemetry Stats Bar */}
+              <div className="flex flex-col gap-2 p-3.5 rounded-lg border border-border/60 bg-background">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-sans">Status</span>
+                  <span className={`text-xs font-semibold font-sans ${statusMeta.color} flex items-center gap-1.5`}>
+                    <span className={`inline-block size-2 rounded-full ${statusMeta.dotColor} ${isCallActive ? "animate-pulse" : ""}`} />
+                    {statusMeta.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-sans">AI State</span>
+                  <Badge className="bg-[#f5a623]/10 text-black border border-[#f5a623]/30 px-2 py-0.5 text-[10px] font-sans font-semibold uppercase">
+                    {aiState}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-sans">Duration</span>
+                  <span className="text-xs font-semibold font-mono text-foreground">
+                    {Math.floor(callDuration / 60)}m {callDuration % 60}s
+                  </span>
+                </div>
+                {latencyMs !== null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-sans">Turn Latency</span>
+                    <Badge className="text-[10px] font-medium bg-[#f0fdf4] text-[#16a34a] border border-[#bbf7d0] rounded-full px-2 py-0.5">
+                      {latencyMs} ms
+                    </Badge>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-background border border-border/60">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-sans">
-                  Stop-to-Play
-                </span>
-                <span className="text-sm font-semibold font-sans text-foreground">
-                  {latencyMs !== null ? `${latencyMs} ms` : "—"}
-                </span>
-              </div>
-            </div>
-          )}
 
-          {/* CTA Button */}
-          {!isCallActive && status !== "connecting" ? (
-            <div className="flex flex-col gap-2 w-full">
-              <Button
-                id="btn-start-call"
-                onClick={startCall}
-                className="w-full rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-sans font-semibold text-sm h-11 gap-2.5 shadow-none transition-colors"
-              >
-                <Mic className="size-4" />
-                Start Call (Mic)
-              </Button>
-              <Button
-                id="btn-start-test-call"
-                onClick={startTestCall}
-                variant="outline"
-                className="w-full rounded-full border-border/70 text-foreground hover:bg-[#f5f5f0] font-sans font-semibold text-sm h-11 gap-2.5 shadow-none transition-colors"
-              >
-                <Mic className="size-4" />
-                Start Test Call (WAV File)
-              </Button>
-            </div>
-          ) : status === "connecting" ? (
-            <Button
-              disabled
-              className="w-full rounded-full bg-[#f5a623]/60 text-black font-sans font-semibold text-sm h-11 gap-2.5 cursor-not-allowed shadow-none"
-            >
-              <Wifi className="size-4 animate-pulse" />
-              Connecting…
-            </Button>
-          ) : (
-            <Button
-              id="btn-end-call"
-              onClick={endCall}
-              variant="outline"
-              className="w-full rounded-full border-[#ef4444]/40 text-[#ef4444] hover:bg-[#fef2f2] hover:border-[#ef4444] font-sans font-semibold text-sm h-11 gap-2.5 shadow-none transition-colors"
-            >
-              <MicOff className="size-4" />
-              End Call
-            </Button>
-          )}
-
-          {/* Mic permission hint */}
-          {status === "idle" && (
-            <p className="text-center text-[11px] text-muted-foreground font-sans">
-              Your browser will request microphone access when you start a call.
-            </p>
-          )}
-
-          {/* Barge-in hint */}
-          {status === "ai_speaking" && (
-            <p className="text-center text-[11px] text-muted-foreground font-sans flex items-center justify-center gap-1.5">
-              <PhoneOff className="size-3" />
-              Speak to interrupt — barge-in is active
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ── Debug Log ────────────────────────────────────────────────────── */}
-      <Card className="border border-border/60 rounded-xl bg-card shadow-none">
-        <CardHeader className="px-5 pt-5 pb-3 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-sm font-semibold text-foreground font-sans">
-              Debug Log
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground font-sans mt-0.5">
-              Connection events, audio metrics, transcripts, and latency.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className="text-[10px] font-semibold bg-muted text-muted-foreground border border-border/60 rounded-full px-2 py-0.5">
-              {logs.length} entries
-            </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLogs([])}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground font-sans rounded-full"
-            >
-              Clear
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="px-3 pb-4">
-          <div
-            ref={logContainerRef}
-            className="h-56 overflow-y-auto rounded-lg border border-border/60 bg-[#f5f5f0] p-3 flex flex-col gap-1 scroll-smooth"
-            style={{ scrollBehavior: "smooth" }}
-          >
-            {logs.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <span className="text-xs text-muted-foreground font-sans font-medium">
-                  No events yet. Start a call to see logs.
-                </span>
-              </div>
-            ) : (
-              logs.map((entry) => {
-                const meta = LOG_LEVEL_META[entry.level];
-                return (
-                  <div
-                    key={entry.id}
-                    className={`flex items-start gap-2 px-2 py-1.5 rounded-md ${meta.bg}`}
-                  >
-                    <span
-                      className={`shrink-0 text-[9px] font-bold font-mono uppercase tracking-widest mt-px ${meta.color}`}
-                    >
-                      {entry.ts}
-                    </span>
-                    <span
-                      className={`shrink-0 text-[9px] font-bold font-mono uppercase tracking-widest mt-px w-7 text-right ${meta.color}`}
-                    >
-                      {meta.label}
-                    </span>
-                    <span className="text-xs font-mono text-foreground/80 leading-relaxed break-all">
-                      {entry.message}
+              {/* Waveform Visualizer */}
+              <div className="relative h-20 rounded-lg border border-border/60 bg-[#f5f5f0] overflow-hidden">
+                {!isCallActive && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[10px] text-muted-foreground font-sans font-semibold tracking-wider uppercase">
+                      Waveform Monitor
                     </span>
                   </div>
-                );
-              })
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                )}
+                <canvas ref={canvasRef} className="w-full h-full block" />
+              </div>
 
-      {/* ── How it works ─────────────────────────────────────────────────── */}
-      <Card className="border border-border/60 rounded-xl bg-card shadow-none">
-        <CardHeader className="px-5 pt-5 pb-3">
-          <CardTitle className="text-sm font-semibold text-foreground font-sans">
-            How This Works
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-5 pb-5">
-          <ol className="flex flex-col gap-3">
-            {[
-              {
-                icon: <Mic className="size-3.5" />,
-                title: "Mic Capture",
-                body: "ScriptProcessorNode captures raw PCM, downsampled to 16kHz mono 16-bit — exactly what Sarvam STT expects.",
-              },
-              {
-                icon: <Wifi className="size-3.5" />,
-                title: "WebSocket Streaming",
-                body: "250ms WAV chunks are streamed continuously to /ws/call. VAD on the backend gates STT invocation.",
-              },
-              {
-                icon: <Phone className="size-3.5" />,
-                title: "Playback",
-                body: "AI audio arrives as MP3 chunks. Played via MediaSource (low latency) with Web Audio API fallback.",
-              },
-              {
-                icon: <PhoneOff className="size-3.5" />,
-                title: "Barge-in",
-                body: "If you speak while the AI is playing audio, the frontend immediately stops playback so the backend can process your new input.",
-              },
-            ].map((step, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <div className="size-5 rounded-full bg-[#f5a623] text-black flex items-center justify-center shrink-0 mt-0.5">
-                  {step.icon}
+              {/* Action Trigger Buttons */}
+              {!isCallActive && status !== "connecting" ? (
+                <div className="flex flex-col gap-2 w-full">
+                  <Button
+                    onClick={startCall}
+                    className="w-full rounded-full bg-[#f5a623] hover:bg-[#e09510] text-black font-semibold font-sans text-xs h-10 gap-2 shadow-sm transition-colors"
+                  >
+                    <Mic className="size-3.5" />
+                    Start Session (Microphone)
+                  </Button>
+                  <Button
+                    onClick={startTestCall}
+                    variant="outline"
+                    className="w-full rounded-full border-border/70 text-foreground font-semibold font-sans text-xs h-10 gap-2 transition-colors"
+                  >
+                    <Play className="size-3.5" />
+                    Stream Test Audio (WAV)
+                  </Button>
                 </div>
-                <div>
-                  <span className="text-xs font-semibold text-foreground font-sans">
-                    {step.title}
-                  </span>
-                  <p className="text-xs text-muted-foreground font-sans mt-0.5 leading-relaxed">
-                    {step.body}
-                  </p>
+              ) : status === "connecting" ? (
+                <Button
+                  disabled
+                  className="w-full rounded-full bg-[#f5a623]/60 text-black font-semibold font-sans text-xs h-10 gap-2 cursor-not-allowed shadow-none"
+                >
+                  <Wifi className="size-3.5 animate-pulse" />
+                  Connecting Sandbox...
+                </Button>
+              ) : (
+                <Button
+                  onClick={endCall}
+                  variant="outline"
+                  className="w-full rounded-full border-[#ef4444]/40 text-[#ef4444] hover:bg-[#fef2f2] hover:border-[#ef4444] font-semibold font-sans text-xs h-10 gap-2 transition-colors"
+                >
+                  <MicOff className="size-3.5" />
+                  End Session
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Column 2: Live Transcripts ── */}
+        <div className="flex flex-col gap-6">
+          <Card className="border border-border/60 rounded-xl bg-card shadow-none flex-1 flex flex-col min-h-[460px]">
+            <CardHeader className="px-5 pt-5 pb-3 border-b border-border/60">
+              <CardTitle className="text-sm font-semibold text-foreground font-sans">
+                Live Conversation Feed
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 flex-1 overflow-y-auto max-h-[420px] flex flex-col gap-4">
+              {logs.filter(l => l.level === "user" || l.level === "ai").length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground gap-2">
+                  <Bot className="size-8 opacity-40 animate-bounce" />
+                  <p className="text-xs font-sans">Sandbox is idle. Start a call to begin speaking with your receptionist.</p>
                 </div>
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
+              ) : (
+                logs
+                  .filter(l => l.level === "user" || l.level === "ai")
+                  .map((log) => {
+                    const isUser = log.level === "user";
+                    return (
+                      <div
+                        key={log.id}
+                        className={`flex flex-col max-w-[85%] ${
+                          isUser ? "self-end items-end" : "self-start items-start"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase font-sans mb-1 px-1">
+                          {isUser ? "You" : "AI Receptionist"}
+                        </span>
+                        <div
+                          className={`p-3.5 rounded-2xl text-xs font-sans leading-relaxed ${
+                            isUser
+                              ? "bg-[#f5a623]/10 text-foreground border border-[#f5a623]/30 rounded-tr-none"
+                              : "bg-muted text-foreground border border-border/40 rounded-tl-none"
+                          }`}
+                        >
+                          {log.message}
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Column 3: Developer Tracing & Telemetry matched logs ── */}
+        <div className="flex flex-col gap-6">
+          <Card className="border border-border/60 rounded-xl bg-card shadow-none flex-1 flex flex-col min-h-[460px]">
+            <CardHeader className="px-5 pt-5 pb-3 border-b border-border/60 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-semibold text-foreground font-sans">
+                  Developer Tracing
+                </CardTitle>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTelemetryLogs([])}
+                className="h-7 px-3 text-[10px] font-sans font-semibold rounded-full hover:bg-muted"
+              >
+                Clear
+              </Button>
+            </CardHeader>
+            <CardContent className="p-5 flex-1 overflow-y-auto max-h-[420px] flex flex-col gap-3 font-mono text-[10px]">
+              {telemetryLogs.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground gap-2">
+                  <Wifi className="size-8 opacity-40" />
+                  <p className="text-[10px] font-sans">No trace telemetry captured yet.</p>
+                </div>
+              ) : (
+                telemetryLogs.map((log, idx) => {
+                  let badgeColor = "bg-muted text-muted-foreground";
+                  if (log.type === "rag") badgeColor = "bg-purple-100 text-purple-700 border border-purple-200";
+                  if (log.type === "tool_call" || log.type === "tool_result") badgeColor = "bg-blue-100 text-blue-700 border border-blue-200";
+                  if (log.type === "booking") badgeColor = "bg-emerald-100 text-emerald-700 border border-emerald-200";
+                  if (log.type === "error") badgeColor = "bg-rose-100 text-rose-700 border border-rose-200";
+
+                  return (
+                    <div key={idx} className="p-3.5 rounded-lg bg-muted/30 border border-border/60 flex flex-col gap-1.5 leading-normal">
+                      <div className="flex items-center justify-between">
+                        <Badge className={`px-2 py-0.5 rounded-full text-[8px] font-semibold tracking-wider font-sans uppercase ${badgeColor}`}>
+                          {log.type}
+                        </Badge>
+                        <span className="text-[9px] text-muted-foreground">{log.timestamp}</span>
+                      </div>
+                      <p className="text-foreground/90 break-all">{log.message}</p>
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+      </div>
     </div>
   );
 }
+
+
