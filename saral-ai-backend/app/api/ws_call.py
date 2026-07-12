@@ -8,6 +8,7 @@ import uuid
 import json
 import logging
 import asyncio
+from typing import Optional
 from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -112,9 +113,16 @@ async def _play_fallback_audio(websocket: WebSocket, phrase_id: str, language: s
     try:
         audio_bytes = get_fallback_audio(phrase_id, language)
         if audio_bytes:
+            from app.services.fallback_audio import FALLBACK_PHRASES
+            fallback_text = FALLBACK_PHRASES.get(phrase_id, "")
             await websocket.send_json({
                 "status": "tts_start"
             })
+            if fallback_text:
+                await websocket.send_json({
+                    "status": "ai_text",
+                    "text": fallback_text
+                })
             await websocket.send_bytes(audio_bytes)
             await websocket.send_json({
                 "status": "tts_end"
@@ -125,7 +133,7 @@ async def _play_fallback_audio(websocket: WebSocket, phrase_id: str, language: s
         logger.error(f"Failed to play fallback audio: {str(e)}", exc_info=True)
 
 
-async def run_stage2_triage_background(call_id: str, user_id: str, caller_number: str, transcript: str):
+async def run_stage2_triage_background(call_id: str, user_id: str, caller_number: str, transcript: str, test_number: Optional[str] = None):
     """
     Runs Stage 2 triage post-call extraction on a threadpool,
     then saves the structured results into the database.
@@ -175,11 +183,18 @@ async def run_stage2_triage_background(call_id: str, user_id: str, caller_number
 
         # Fetch clinic owner's whatsapp_number to send Stage 2 case card
         try:
-            def _get_user_whatsapp():
-                return supabase.table("users").select("whatsapp_number").eq("id", user_id).execute()
-            user_res = await run_in_threadpool(_get_user_whatsapp)
-            if user_res.data and user_res.data[0].get("whatsapp_number"):
-                whatsapp_number = user_res.data[0]["whatsapp_number"]
+            whatsapp_number = None
+            if test_number:
+                whatsapp_number = test_number
+                logger.info(f"Using test phone number for Stage 2 case card routing: {whatsapp_number}")
+            else:
+                def _get_user_whatsapp():
+                    return supabase.table("users").select("whatsapp_number").eq("id", user_id).execute()
+                user_res = await run_in_threadpool(_get_user_whatsapp)
+                if user_res.data and user_res.data[0].get("whatsapp_number"):
+                    whatsapp_number = user_res.data[0]["whatsapp_number"]
+            
+            if whatsapp_number:
                 logger.info(f"Sending Stage 2 case card to owner {whatsapp_number} for call_id={call_id}")
                 from app.services.whatsapp import send_case_card
                 await send_case_card(whatsapp_number, triage_data)
@@ -205,7 +220,7 @@ async def run_stage2_triage_background(call_id: str, user_id: str, caller_number
 
 
 @router.websocket("/ws/call")
-async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id: str = None, user_id: str = None):
+async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id: str = None, user_id: str = None, caller_number: Optional[str] = None, agent_id: Optional[str] = None):
     """
     WebSocket endpoint for real-time voice call handling.
     Accepts raw audio bytes, transcribes them using Sarvam STT,
@@ -219,7 +234,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
     if not call_id:
         call_id = str(uuid.uuid4())
         
-    caller_number = "unknown"
+    db_caller_number = "unknown"
     if call_id:
         try:
             supabase = get_supabase()
@@ -227,46 +242,93 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 return supabase.table("call_logs").select("caller_number").eq("id", call_id).execute()
             existing_res = await run_in_threadpool(_get_caller)
             if existing_res.data:
-                caller_number = existing_res.data[0].get("caller_number", "unknown")
+                db_caller_number = existing_res.data[0].get("caller_number", "unknown")
+            elif caller_number:
+                db_caller_number = caller_number
+                # Insert call log to make it exist for testing
+                call_log_data = {
+                    "id": call_id,
+                    "user_id": user_id,
+                    "caller_number": db_caller_number,
+                    "status": "ongoing",
+                    "started_at": datetime.now(timezone.utc).isoformat()
+                }
+                if agent_id:
+                    call_log_data["agent_id"] = agent_id
+                def _insert_call_log():
+                    return supabase.table("call_logs").insert(call_log_data).execute()
+                await run_in_threadpool(_insert_call_log)
+                logger.info(f"Recorded initial call log {call_id} for browser test call. caller_number={db_caller_number}")
         except Exception as e:
-            logger.error(f"Failed to fetch caller_number for session: {e}")
+            logger.error(f"Failed to fetch or insert caller_number for session: {e}")
 
-    logger.info(f"WebSocket connection established with language={language}, call_id={call_id}, user_id={user_id}, caller_number={caller_number}")
+    caller_number = db_caller_number
+    logger.info(f"WebSocket connection established with language={language}, call_id={call_id}, user_id={user_id}, agent_id={agent_id}, caller_number={caller_number}")
     
     conversation_history = []
     turn_number = 0
     
     # Use settings.SILENCE_THRESHOLD_MS from config/env as the default baseline VAD threshold
     vad_threshold = settings.SILENCE_THRESHOLD_MS
+    user_system_prompt = None
+    user_voice_id = "shruti"
+    working_hours = None
+    appointment_duration = 30
+    escalation_rules = None
+
     if user_id:
         try:
             supabase = get_supabase()
-            def _get_vad():
+            
+            # Fetch VAD threshold from users table
+            def _get_user_vad():
                 return supabase.table("users").select("vad_threshold_ms").eq("id", user_id).execute()
-            user_res = await run_in_threadpool(_get_vad)
-            if user_res.data and user_res.data[0].get("vad_threshold_ms") is not None:
-                raw_val = user_res.data[0]["vad_threshold_ms"]
-                if isinstance(raw_val, int):
-                    vad_threshold = max(600, min(2000, raw_val))
-                elif isinstance(raw_val, str):
-                    clean_val = raw_val.lower().replace("ms", "").strip()
-                    if "-" in clean_val:
-                        parts = clean_val.split("-")
-                        try:
-                            v1 = int(parts[0].strip())
-                            v2 = int(parts[1].strip())
-                            vad_threshold = int((v1 + v2) / 2)
-                        except ValueError:
-                            vad_threshold = 1000
-                    else:
-                        try:
-                            vad_threshold = int(clean_val)
-                        except ValueError:
-                            vad_threshold = 1000
-                    vad_threshold = max(600, min(2000, vad_threshold))
-                logger.info(f"Using VAD threshold: {vad_threshold}ms (fetched for user {user_id})")
+            user_res = await run_in_threadpool(_get_user_vad)
+            if user_res.data:
+                raw_val = user_res.data[0].get("vad_threshold_ms")
+                if raw_val is not None:
+                    if isinstance(raw_val, int):
+                        vad_threshold = max(600, min(2000, raw_val))
+                    elif isinstance(raw_val, str):
+                        clean_val = raw_val.lower().replace("ms", "").strip()
+                        if "-" in clean_val:
+                            parts = clean_val.split("-")
+                            try:
+                                v1 = int(parts[0].strip())
+                                v2 = int(parts[1].strip())
+                                vad_threshold = int((v1 + v2) / 2)
+                            except ValueError:
+                                vad_threshold = 1000
+                        else:
+                            try:
+                                vad_threshold = int(clean_val)
+                            except ValueError:
+                                vad_threshold = 1000
+                        vad_threshold = max(600, min(2000, vad_threshold))
+
+            # Fetch agent settings from agents table
+            if agent_id:
+                def _get_agent_settings():
+                    return supabase.table("agents").select("system_prompt, voice_id, working_hours, appointment_duration, escalation_rules").eq("id", agent_id).eq("user_id", user_id).execute()
+                agent_res = await run_in_threadpool(_get_agent_settings)
+            else:
+                def _get_latest_agent():
+                    return supabase.table("agents").select("system_prompt, voice_id, working_hours, appointment_duration, escalation_rules").eq("user_id", user_id).order("updated_at", desc=True).limit(1).execute()
+                agent_res = await run_in_threadpool(_get_latest_agent)
+
+            if agent_res.data:
+                settings_data = agent_res.data[0]
+                user_system_prompt = settings_data.get("system_prompt")
+                user_voice_id = settings_data.get("voice_id") or "shruti"
+                working_hours = settings_data.get("working_hours")
+                appointment_duration = settings_data.get("appointment_duration") or 30
+                escalation_rules = settings_data.get("escalation_rules")
+                logger.info(f"Loaded agent settings: Voice={user_voice_id}, SystemPromptLength={len(user_system_prompt) if user_system_prompt else 0}")
+            else:
+                user_system_prompt = "You are a friendly AI receptionist for City Physiotherapy Clinic. Your name is Shruti. Always be warm, professional, and speak in a mix of Hindi and English (Hinglish) when appropriate."
+                user_voice_id = "shruti"
         except Exception as e:
-            logger.error(f"Failed to fetch vad_threshold_ms for user {user_id}: {e}")
+            logger.error(f"Failed to fetch user/agent settings: {e}")
             
     vad_detector = VoiceActivityDetector(silence_threshold_ms=vad_threshold)
     turn_start_time = None
@@ -308,7 +370,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
     logger.info(f"Playing initial welcome greeting: '{welcome_text}'")
     try:
         await websocket.send_json({"status": "tts_start"})
-        async for chunk in text_to_speech_stream(welcome_text, language):
+        await websocket.send_json({"status": "ai_text", "text": welcome_text})
+        async for chunk in text_to_speech_stream(welcome_text, language, speaker=user_voice_id):
             if chunk:
                 await websocket.send_bytes(chunk)
         await websocket.send_json({"status": "tts_end"})
@@ -462,7 +525,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 try:
                     transcript = await asyncio.wait_for(
                         run_in_threadpool(speech_to_text, audio_to_process, language),
-                        timeout=3.0
+                        timeout=6.0
                     )
                 except asyncio.TimeoutError as te:
                     logger.error(f"STT Timeout Error: {str(te)}", exc_info=True)
@@ -507,6 +570,13 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     "status": "transcribed",
                     "text": transcript
                 })
+                try:
+                    await websocket.send_json({
+                        "status": "state_change",
+                        "state": "Thinking"
+                    })
+                except Exception:
+                    pass
                 _t_transcribed_send_end = time.perf_counter()
                 
                 # ── STEP 3: History append + cap (pure CPU) ──────────────────
@@ -529,11 +599,22 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 from app.services.intent_cache import _load_model as _cache_load_model
                 _cache_model_available = _cache_load_model() is not False
                 _t_cache_start = time.perf_counter()
+                
+                # Bypass cache for booking intents (which require tool calls / database writes)
+                is_booking_intent = any(kw in transcript.lower() for kw in [
+                    "book", "appointment", "slot", "reserve", "confirm", "schedule",
+                    "yes", "correct", "haan", "correct", "okay"
+                ])
+                
                 try:
-                    cache_hit = await asyncio.wait_for(
-                        semantic_cache.lookup(transcript, language),
-                        timeout=0.2  # 200ms hard ceiling — cache is an optimisation, not a gate
-                    )
+                    if is_booking_intent:
+                        cache_hit = None
+                        logger.info(f"[{turn_id}] Booking intent detected. Bypassing semantic cache to ensure database writes.")
+                    else:
+                        cache_hit = await asyncio.wait_for(
+                            semantic_cache.lookup(transcript, language),
+                            timeout=0.2  # 200ms hard ceiling — cache is an optimisation, not a gate
+                        )
                 except asyncio.TimeoutError:
                     cache_hit = None
                     logger.warning(
@@ -568,7 +649,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         first_audio_sent_at = time.perf_counter()
                         await websocket.send_bytes(cached_audio)
                     else:
-                        async for chunk in text_to_speech_stream(cached_reply, language):
+                        async for chunk in text_to_speech_stream(cached_reply, language, speaker=user_voice_id):
                             if chunk:
                                 if first_audio_sent_at is None:
                                     first_audio_sent_at = time.perf_counter()
@@ -611,13 +692,21 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                 # ── STEP 5: RAG lookup (Supabase, only when user_id is set) ─
                 _t_rag_start = time.perf_counter()
                 _rag_faq_count = 0
-                system_prompt = None
+                system_prompt = user_system_prompt
                 if user_id:
                     try:
                         emb = await semantic_cache.embed_text(transcript)
                         faqs = await get_relevant_faqs(emb.tolist(), user_id)
                         _rag_faq_count = len(faqs) if faqs else 0
                         if faqs:
+                            try:
+                                await websocket.send_json({
+                                    "status": "rag_retrieval",
+                                    "queries": transcript,
+                                    "matches": [f["question"] for f in faqs]
+                                })
+                            except Exception:
+                                pass
                             faq_items = []
                             for f in faqs:
                                 item_str = f"- Question: {f['question']}\n  Answer: {f['answer']}"
@@ -643,11 +732,14 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                 faq_items.append(item_str)
                                 
                             faq_context = "\n".join(faq_items)
-                            system_prompt = (
+                            base_prompt = user_system_prompt or (
                                  "You are Shruti, a helpful female receptionist AI assistant for Saral AI. "
                                  "Because you are a female and your voice is female (Shruti), you must always refer to yourself "
                                  "in the female grammatical gender (e.g. use 'कर सकती हूँ', 'करूँगी', 'व्यस्त हूँ', etc. instead "
-                                 "of male verbs/pronouns).\n\n"
+                                 "of male verbs/pronouns)."
+                            )
+                            system_prompt = (
+                                 f"{base_prompt}\n\n"
                                  f"Use the following relevant business FAQs to answer the user's question:\n{faq_context}\n\n"
                                  "[LANGUAGE GUIDELINE: The user will frequently speak in \"Hinglish\" (a mix of Hindi and English). "
                                  "You must perfectly understand this mix. Always reply in the same natural, conversational language the "
@@ -697,7 +789,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         history,
                         sys_prompt,
                         user_id,
-                        call_id
+                        call_id,
+                        executed_tool_messages
                     )
                     iterator = stream_gen.__aiter__()
                     try:
@@ -800,7 +893,7 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                 logger.warning(f"[{turn_id}] Skipping non-speakable TTS chunk for sentence {sentence_idx}: {sentence_str!r}")
                                 await queue.put(None)
                                 return
-                            async for chunk in text_to_speech_stream(sentence_str, language):
+                            async for chunk in text_to_speech_stream(sentence_str, language, speaker=user_voice_id):
                                 if interrupt_event.is_set() or turn_failed_event.is_set():
                                     break
                                 if chunk:
@@ -891,8 +984,14 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                                             break
                                         if not tts_started:
                                             await websocket.send_json({"status": "tts_start"})
+                                            await websocket.send_json({"status": "state_change", "state": "Speaking"})
                                             tts_started = True
                                         if not sentence_audio_started:
+                                            try:
+                                                current_text = sentence_telemetry[sentence_idx - 1]["text"]
+                                                await websocket.send_json({"status": "ai_text", "text": current_text})
+                                            except Exception as text_err:
+                                                logger.warning(f"Failed to send sentence text: {text_err}")
                                             audio_start_at = time.perf_counter()
                                             audio_start_iso = datetime.now(timezone.utc).isoformat()
                                             sentence_audio_started = True
@@ -930,10 +1029,44 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     if tts_tasks:
                         await asyncio.gather(*tts_tasks, return_exceptions=True)
 
+                # ── Play Immediate Filler Response ───────────────────
+                if user_id and is_booking_intent:
+                    is_confirm_turn = any(kw in transcript.lower() for kw in ["yes", "correct", "haan", "haanji", "haji", "okay", "confirm"])
+                    if is_confirm_turn:
+                        if language.startswith("hi"):
+                            filler_text = "एक मिनट, मैं कन्फर्म करती हूँ।"
+                        else:
+                            filler_text = "One moment, confirming..."
+                    else:
+                        if language.startswith("hi"):
+                            filler_text = "एक मिनट, मैं स्लॉट चेक करती हूँ।"
+                        else:
+                            filler_text = "Let me check that for you..."
+                    
+                    logger.info(f"[{turn_id}] Booking turn detected. Playing filler: '{filler_text}'")
+                    try:
+                        await websocket.send_json({"status": "tts_start"})
+                        await websocket.send_json({"status": "ai_text", "text": filler_text})
+                        async for chunk in text_to_speech_stream(filler_text, language, speaker=user_voice_id):
+                            if interrupt_event.is_set():
+                                logger.info(f"[{turn_id}] Filler interrupted by client.")
+                                break
+                            if chunk:
+                                await websocket.send_bytes(chunk)
+                        await websocket.send_json({"status": "tts_end"})
+                        logger.info(f"[{turn_id}] Filler playback completed.")
+                    except Exception as filler_err:
+                        logger.error(f"[{turn_id}] Error playing filler response: {filler_err}", exc_info=True)
+
+                    if interrupt_event.is_set():
+                        logger.info(f"[{turn_id}] Interrupted before LLM generation. Skipping LLM pipeline.")
+                        continue
+
                 try:
                     logger.info("Attempting LLM stream first try...")
                     chunks_received = []
-                    chunk_gen = consume_llm_stream(transcript, conversation_history[:-1], system_prompt, 10.0)
+                    executed_tool_messages = []
+                    chunk_gen = consume_llm_stream(transcript, conversation_history[:-1], system_prompt, 30.0)
                     
                     logger.info(f"[{turn_id}] [TELEMETRY] Starting TTS streaming loop (first attempt) at {datetime.now(timezone.utc).isoformat()}")
                     await run_concurrent_llm_tts_pipeline(chunk_gen)
@@ -947,7 +1080,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                         shorter_transcript = transcript[:50] if len(transcript) > 50 else transcript
                         try:
                             chunks_received = []
-                            chunk_gen = consume_llm_stream(shorter_transcript, conversation_history[:-1], system_prompt, 8.0)
+                            chunk_gen = consume_llm_stream(shorter_transcript, conversation_history[:-1], system_prompt, 25.0)
+
                             
                             logger.info(f"[{turn_id}] [TELEMETRY] Starting TTS streaming loop (retry attempt) at {datetime.now(timezone.utc).isoformat()}")
                             await run_concurrent_llm_tts_pipeline(chunk_gen)
@@ -973,7 +1107,11 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                             await websocket.send_json({
                                 "status": "tts_start"
                             })
-                            async for chunk in text_to_speech_stream(exit_msg, language):
+                            await websocket.send_json({
+                                "status": "ai_text",
+                                "text": exit_msg
+                            })
+                            async for chunk in text_to_speech_stream(exit_msg, language, speaker=user_voice_id):
                                 if chunk:
                                     await websocket.send_bytes(chunk)
                             await websocket.send_json({
@@ -998,6 +1136,36 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     llm_stream_end = time.perf_counter()
                 llm_generation_ms = int(round((llm_stream_end - llm_start) * 1000))
                 logger.info(f"LLM Reply: {llm_reply}")
+                
+                # Append tool messages (if any were executed) to history BEFORE final assistant reply
+                if 'executed_tool_messages' in locals() and executed_tool_messages:
+                    for tool_msg in executed_tool_messages:
+                        conversation_history.append(tool_msg)
+                        try:
+                            if tool_msg.get("role") == "assistant" and "tool_calls" in tool_msg:
+                                for tc in tool_msg["tool_calls"]:
+                                    await websocket.send_json({
+                                        "status": "tool_call",
+                                        "name": tc["function"]["name"],
+                                        "args": tc["function"]["arguments"]
+                                    })
+                            elif tool_msg.get("role") == "tool":
+                                await websocket.send_json({
+                                    "status": "tool_result",
+                                    "result": tool_msg.get("content")
+                                })
+                                # Emit a booking event if it's booking related
+                                try:
+                                    res_obj = json.loads(tool_msg.get("content", "{}"))
+                                    await websocket.send_json({
+                                        "status": "booking_event",
+                                        "type": res_obj.get("status", "error"),
+                                        "details": res_obj.get("message", "")
+                                    })
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            logger.error(f"Error sending tool telemetry: {e}")
                 
                 # 6. Append assistant reply to history
                 conversation_history.append({
@@ -1058,6 +1226,17 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     "sentence_telemetry": sentence_telemetry
                 }
                 logger.info(f"[{turn_id}] LATENCY_LOG: {json.dumps(latency_log)}")
+                try:
+                    await websocket.send_json({
+                        "status": "latency",
+                        "latency_ms": total_ms
+                    })
+                    await websocket.send_json({
+                        "status": "state_change",
+                        "state": "Listening"
+                    })
+                except Exception:
+                    pass
                 
             except WebSocketDisconnect as ws_disc:
                 logger.info("WebSocket disconnected gracefully inside step loop.")
@@ -1171,8 +1350,12 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                     def _get_user_summary_preference():
                         return supabase.table("users").select("whatsapp_number, notification_preference").eq("id", user_id).execute()
                     user_res = await run_in_threadpool(_get_user_summary_preference)
-                    if user_res.data and user_res.data[0].get("whatsapp_number"):
-                        whatsapp_number = user_res.data[0]["whatsapp_number"]
+                    if user_res.data:
+                        # For browser test calls, route notifications to the tester's number instead of the clinic owner's whatsapp_number
+                        if 'is_test_call' in locals() and is_test_call and caller_number and caller_number != "unknown":
+                            whatsapp_number = caller_number
+                        else:
+                            whatsapp_number = user_res.data[0].get("whatsapp_number")
                         preference = user_res.data[0].get("notification_preference", "urgent_only")
                         
                         should_send = True
@@ -1220,7 +1403,8 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
                             call_id=call_id,
                             user_id=user_id,
                             caller_number=db_caller_number,
-                            transcript=db_transcript
+                            transcript=db_transcript,
+                            test_number=db_caller_number if ('is_test_call' in locals() and is_test_call) else None
                         )
                     )
 
