@@ -202,7 +202,7 @@ def _fireworks_chat(
                                                 "id": tc.get("id", ""),
                                                 "type": tc.get("type", "function"),
                                                 "function": {
-                                                    "name": tc.get("function", {}).get("name", ""),
+                                                    "name": "",
                                                     "arguments": ""
                                                 }
                                             }
@@ -211,10 +211,10 @@ def _fireworks_chat(
                                                 tool_calls_builder[idx]["id"] = tc["id"]
                                         
                                         func = tc.get("function") or {}
-                                        name_delta = func.get("name", "")
+                                        name_delta = func.get("name") or ""
                                         if name_delta:
                                             tool_calls_builder[idx]["function"]["name"] += name_delta
-                                        args_delta = func.get("arguments", "")
+                                        args_delta = func.get("arguments") or ""
                                         if args_delta:
                                             tool_calls_builder[idx]["function"]["arguments"] += args_delta
                             except Exception as parse_err:
@@ -326,7 +326,12 @@ def get_response(
             role = str(msg["role"]).strip().lower()
             if role not in ["system", "user", "assistant", "tool"]:
                 role = "user"
-            messages.append({"role": role, "content": str(msg["content"])})
+            msg_dict = {"role": role, "content": str(msg["content"])}
+            if "tool_calls" in msg and msg["tool_calls"]:
+                msg_dict["tool_calls"] = msg["tool_calls"]
+            if "tool_call_id" in msg and msg["tool_call_id"]:
+                msg_dict["tool_call_id"] = msg["tool_call_id"]
+            messages.append(msg_dict)
 
     # ------------------------------------------------------------------
     # Build / inject system prompt (identical logic to groq_llm.py)
@@ -341,7 +346,9 @@ def get_response(
         "After calling hold_appointment_slot, you MUST explicitly read back the critical "
         "information (date, time, and caller phone number if known) and ask for confirmation. "
         "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', "
-        "'correct', 'haan', or confirms) after you read back the details. "
+        "'correct', 'haan', or confirms) after you read back the details. Once a slot is successfully "
+        "held, you must NEVER call hold_appointment_slot again for that same slot; you must call "
+        "confirm_appointment to finalize it. "
         "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
         "If a user provides a vague time, you must immediately ask them to clarify by offering "
         "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
@@ -476,66 +483,67 @@ def get_response(
                         "message": "Missing slot datetime or user ID",
                     }
 
-                # Append assistant tool-call turn to history
-                messages.append(
+            tool_msg = {
+                "role": "assistant",
+                "content": choice_msg.get("content") or "",
+                "tool_calls": [
                     {
-                        "role": "assistant",
-                        "content": choice_msg.get("content") or "",
-                        "tool_calls": [
-                            {
-                                "id": tool_call["id"],
-                                "type": "function",
-                                "function": {
-                                    "name": tool_call["function"]["name"],
-                                    "arguments": tool_call["function"]["arguments"],
-                                },
-                            }
-                        ],
+                        "id": tool_call["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tool_call["function"]["name"],
+                            "arguments": tool_call["function"]["arguments"],
+                        },
                     }
-                )
+                ],
+            }
+            messages.append(tool_msg)
+            conversation_history.append(tool_msg)
 
-                # Build tool result message
-                if db_result["success"]:
-                    if tool_name == "hold_appointment_slot":
-                        tool_output = json.dumps({
-                            "status": "success",
-                            "message": f"Appointment slot {slot_dt} is now held as pending for 10 minutes.",
-                        })
-                    else:
-                        tool_output = json.dumps({
-                            "status": "success",
-                            "message": f"Appointment slot {slot_dt} has been successfully confirmed.",
-                        })
-                elif db_result.get("error") == "SLOT_TAKEN":
+            # Build tool result message
+            if db_result["success"]:
+                if tool_name == "hold_appointment_slot":
                     tool_output = json.dumps({
-                        "status": "error",
-                        "reason": "SLOT_TAKEN",
-                        "message": "The requested slot is already taken or held by another booking.",
-                    })
-                elif db_result.get("error") == "NO_PENDING_SLOT":
-                    tool_output = json.dumps({
-                        "status": "error",
-                        "reason": "NO_PENDING_SLOT",
-                        "message": "No pending reservation was found for this time slot. It may have expired.",
+                        "status": "success",
+                        "message": f"Appointment slot {slot_dt} is now held as pending for 10 minutes.",
                     })
                 else:
                     tool_output = json.dumps({
-                        "status": "error",
-                        "reason": db_result.get("error"),
-                        "message": db_result.get("message"),
+                        "status": "success",
+                        "message": f"Appointment slot {slot_dt} has been successfully confirmed.",
                     })
-
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call["id"],
-                    "content": tool_output,
+            elif db_result.get("error") == "SLOT_TAKEN":
+                tool_output = json.dumps({
+                    "status": "error",
+                    "reason": "SLOT_TAKEN",
+                    "message": "The requested slot is already taken or held by another booking.",
+                })
+            elif db_result.get("error") == "NO_PENDING_SLOT":
+                tool_output = json.dumps({
+                    "status": "error",
+                    "reason": "NO_PENDING_SLOT",
+                    "message": "No pending reservation was found for this time slot. It may have expired.",
+                })
+            else:
+                tool_output = json.dumps({
+                    "status": "error",
+                    "reason": db_result.get("error"),
+                    "message": db_result.get("message"),
                 })
 
-                # Follow-up call after tool execution
-                followup_data = _fireworks_chat(messages=messages, model=model, api_key=api_key)
-                followup_choices = followup_data.get("choices") or []
-                if followup_choices and followup_choices[0].get("message"):
-                    return followup_choices[0]["message"].get("content") or ""
+            tool_res_msg = {
+                "role": "tool",
+                "tool_call_id": tool_call["id"],
+                "content": tool_output,
+            }
+            messages.append(tool_res_msg)
+            conversation_history.append(tool_res_msg)
+
+            # Follow-up call after tool execution
+            followup_data = _fireworks_chat(messages=messages, model=model, api_key=api_key)
+            followup_choices = followup_data.get("choices") or []
+            if followup_choices and followup_choices[0].get("message"):
+                return followup_choices[0]["message"].get("content") or ""
 
         return choice_msg.get("content") or ""
 
@@ -653,7 +661,7 @@ async def _fireworks_chat_stream_async(
                                                 "id": tc.get("id", ""),
                                                 "type": tc.get("type", "function"),
                                                 "function": {
-                                                    "name": tc.get("function", {}).get("name", ""),
+                                                    "name": "",
                                                     "arguments": ""
                                                 }
                                             }
@@ -662,10 +670,10 @@ async def _fireworks_chat_stream_async(
                                                 tool_calls_builder[idx]["id"] = tc["id"]
                                         
                                         func = tc.get("function") or {}
-                                        name_delta = func.get("name", "")
+                                        name_delta = func.get("name") or ""
                                         if name_delta:
                                             tool_calls_builder[idx]["function"]["name"] += name_delta
-                                        args_delta = func.get("arguments", "")
+                                        args_delta = func.get("arguments") or ""
                                         if args_delta:
                                             tool_calls_builder[idx]["function"]["arguments"] += args_delta
                             except Exception as parse_err:
@@ -729,6 +737,7 @@ async def get_response_stream_async(
     system_prompt: str = None,
     user_id: Optional[str] = None,
     call_id: Optional[str] = None,
+    executed_tool_messages: Optional[List[Dict[str, Any]]] = None,
 ):
     api_key = os.getenv("FIREWORKS_API_KEY")
     if not api_key or api_key == "placeholder-fireworks-key":
@@ -736,7 +745,16 @@ async def get_response_stream_async(
             "FIREWORKS_API_KEY environment variable is not set or contains a placeholder value."
         )
 
-    model = os.getenv("FIREWORKS_MODEL", DEFAULT_MODEL)
+    # Fast conversational model for regular turns; when booking tools are
+    # injected (user_id present) use a model that reliably executes function
+    # calls instead of paraphrasing them as plain text.
+    _chat_model = os.getenv("FIREWORKS_MODEL", DEFAULT_MODEL)
+    if user_id:
+        model = os.getenv("FIREWORKS_TOOL_MODEL", DEFAULT_MODEL)
+    else:
+        model = _chat_model
+    if model != _chat_model:
+        logger.info("[fireworks_llm] Using tool-capable model '%s' for this turn (tools active).", model)
 
     messages: List[Dict[str, Any]] = []
     for msg in conversation_history:
@@ -744,7 +762,15 @@ async def get_response_stream_async(
             role = str(msg["role"]).strip().lower()
             if role not in ["system", "user", "assistant", "tool"]:
                 role = "user"
-            messages.append({"role": role, "content": str(msg["content"])})
+            msg_dict = {"role": role, "content": str(msg["content"])}
+            if "tool_calls" in msg and msg["tool_calls"]:
+                msg_dict["tool_calls"] = msg["tool_calls"]
+            if "tool_call_id" in msg and msg["tool_call_id"]:
+                msg_dict["tool_call_id"] = msg["tool_call_id"]
+            messages.append(msg_dict)
+
+    logger.info("[fireworks_llm] messages sent to api:\n%s", json.dumps(messages, indent=2))
+
 
     default_sys = (
         "You are Shruti, a helpful female receptionist AI assistant for Saral AI. "
@@ -756,7 +782,9 @@ async def get_response_stream_async(
         "After calling hold_appointment_slot, you MUST explicitly read back the critical "
         "information (date, time, and caller phone number if known) and ask for confirmation. "
         "Only call the confirm_appointment tool if the user explicitly agrees (e.g., says 'yes', "
-        "'correct', 'haan', or confirms) after you read back the details. "
+        "'correct', 'haan', or confirms) after you read back the details. Once a slot is successfully "
+        "held, you must NEVER call hold_appointment_slot again for that same slot; you must call "
+        "confirm_appointment to finalize it. "
         "You must NEVER accept vague times like 'morning', 'afternoon', 'evening', or 'kal subah'. "
         "If a user provides a vague time, you must immediately ask them to clarify by offering "
         "specific options (e.g., 'What exact time works for you? I have slots at 10 AM, 11 AM, "
@@ -889,22 +917,23 @@ async def get_response_stream_async(
                     "message": "Missing slot datetime or user ID",
                 }
 
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": "".join(text_content),
-                    "tool_calls": [
-                        {
-                            "id": tool_call["id"],
-                            "type": "function",
-                            "function": {
-                                "name": tool_call["function"]["name"],
-                                "arguments": tool_call["function"]["arguments"],
-                            },
-                        }
-                    ],
-                }
-            )
+            tool_msg = {
+                "role": "assistant",
+                "content": "".join(text_content),
+                "tool_calls": [
+                    {
+                        "id": tool_call["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tool_call["function"]["name"],
+                            "arguments": tool_call["function"]["arguments"],
+                        },
+                    }
+                ],
+            }
+            messages.append(tool_msg)
+            if executed_tool_messages is not None:
+                executed_tool_messages.append(tool_msg)
 
             if db_result["success"]:
                 if tool_name == "hold_appointment_slot":
@@ -936,11 +965,14 @@ async def get_response_stream_async(
                     "message": db_result.get("message"),
                 })
 
-            messages.append({
+            tool_res_msg = {
                 "role": "tool",
                 "tool_call_id": tool_call["id"],
                 "content": tool_output,
-            })
+            }
+            messages.append(tool_res_msg)
+            if executed_tool_messages is not None:
+                executed_tool_messages.append(tool_res_msg)
 
             async for event in _fireworks_chat_stream_async(messages=messages, model=model, api_key=api_key):
                 if event["type"] == "content":
