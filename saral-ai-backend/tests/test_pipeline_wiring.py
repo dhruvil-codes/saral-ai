@@ -7,12 +7,21 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.supabase_client import get_supabase
 from app.api.ws_call import run_stage2_triage_background
 
-async def main():
+import pytest
+
+@pytest.mark.asyncio
+async def test_full_pipeline_flow():
+    # Check Supabase credentials, skip if not set
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    if not url or not key or url == "placeholder-supabase-url" or key == "placeholder-supabase-key" or url == "placeholder" or key == "placeholder":
+        pytest.skip("Supabase credentials not configured in environment")
+
     print("Starting Post-Call Stage 2 Triage Pipeline Integration Test...")
     supabase = get_supabase()
     
@@ -104,4 +113,4 @@ Assistant: Sure Amit, I've booked it for you.
         print("Error fetching lead from DB:", e)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_full_pipeline_flow())

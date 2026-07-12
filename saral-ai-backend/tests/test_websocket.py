@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 # Make sure app is in path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi.testclient import TestClient
 from app.main import app
@@ -27,6 +27,26 @@ semantic_cache.embed_text = mock_embed_text
 
 class TestWebSocketCall(unittest.TestCase):
 
+    def setUp(self):
+        self.supabase_patcher = patch("app.db.supabase_client.get_supabase")
+        self.mock_get_supabase = self.supabase_patcher.start()
+        self.mock_client = MagicMock()
+        self.mock_get_supabase.return_value = self.mock_client
+        self.mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+        self.mock_client.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(data=[])
+        self.mock_client.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[])
+        self.mock_client.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[])
+
+    def tearDown(self):
+        self.supabase_patcher.stop()
+
+    def _consume_welcome(self, websocket, language="en-IN"):
+        welcome_text = "Hello! How can I help you today?" if language.startswith("en") else "नमस्ते! मैं आपकी क्या सहायता कर सकता हूँ?"
+        self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
+        self.assertEqual(websocket.receive_json(), {"status": "ai_text", "text": welcome_text})
+        websocket.receive_bytes()
+        self.assertEqual(websocket.receive_json(), {"status": "tts_end"})
+
     @patch("app.api.ws_call.speech_to_text")
     @patch("app.api.ws_call.get_response_stream_async")
     @patch("app.api.ws_call.text_to_speech_stream")
@@ -38,7 +58,7 @@ class TestWebSocketCall(unittest.TestCase):
             yield "Hello how can I assist you"
         mock_llm.side_effect = mock_llm_stream
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"synthesized-audio-bytes"
         mock_tts_stream.side_effect = mock_stream
 
@@ -47,6 +67,7 @@ class TestWebSocketCall(unittest.TestCase):
 
         # Connect to WebSocket
         with client.websocket_connect("/ws/call?language=hi-IN") as websocket:
+            self._consume_welcome(websocket, "hi-IN")
             # Send dummy audio bytes
             websocket.send_bytes(b"input-audio-bytes")
             
@@ -83,13 +104,14 @@ class TestWebSocketCall(unittest.TestCase):
         mock_llm.side_effect = mock_llm_stream
         mock_fallback.return_value = b"fake-stt-fallback-audio"
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"tts-bytes"
         mock_tts_stream.side_effect = mock_stream
 
         client = TestClient(app)
 
         with client.websocket_connect("/ws/call") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             # First send: STT fails, returns fallback audio
             websocket.send_bytes(b"audio-1")
             self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
@@ -143,10 +165,10 @@ class TestWebSocketCall(unittest.TestCase):
         mock_llm.side_effect = mock_llm_stream_wrapper
         mock_fallback.return_value = b"fake-llm-fallback-audio"
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"tts-bytes"
         
-        async def mock_error_stream(text, language_code):
+        async def mock_error_stream(text, language_code, *args, **kwargs):
             raise RuntimeError("Sarvam TTS failed")
             if False:
                 yield b""
@@ -156,6 +178,7 @@ class TestWebSocketCall(unittest.TestCase):
         client = TestClient(app)
 
         with client.websocket_connect("/ws/call") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             # Turn 1: LLM fails first attempt, succeeds on retry
             websocket.send_bytes(b"audio-1")
             self.assertEqual(websocket.receive_json(), {"status": "transcribed", "text": "Hello"})
@@ -223,10 +246,10 @@ class TestWebSocketCall(unittest.TestCase):
                 yield token
         mock_llm.side_effect = mock_llm_stream_wrapper
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"tts-chunk"
             
-        async def mock_timeout_stream(text, language_code):
+        async def mock_timeout_stream(text, language_code, *args, **kwargs):
             raise httpx.TimeoutException("TTS stream timeout")
             if False:
                 yield b""
@@ -236,6 +259,7 @@ class TestWebSocketCall(unittest.TestCase):
         client = TestClient(app)
         
         with client.websocket_connect("/ws/call") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             # Turn 1: STT raises httpx.TimeoutException
             websocket.send_bytes(b"audio-1")
             self.assertEqual(websocket.receive_json(), {"status": "tts_start"})
@@ -291,7 +315,7 @@ class TestWebSocketCall(unittest.TestCase):
                 yield token
         mock_llm.side_effect = mock_llm_stream_wrapper
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"tts"
         mock_tts_stream.side_effect = mock_stream
 
@@ -304,6 +328,7 @@ class TestWebSocketCall(unittest.TestCase):
             client = TestClient(app)
 
             with client.websocket_connect("/ws/call") as websocket:
+                self._consume_welcome(websocket, "en-IN")
                 # Turn 1
                 websocket.send_bytes(b"audio-1")
                 self.assertEqual(websocket.receive_json(), {"status": "transcribed", "text": "Msg 1"})
@@ -353,7 +378,7 @@ class TestWebSocketCall(unittest.TestCase):
         mock_llm.side_effect = mock_empty_gen
         mock_fallback.return_value = b"fallback-audio"
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"emergency-tts-audio"
         mock_tts_stream.side_effect = mock_stream
         
@@ -369,6 +394,7 @@ class TestWebSocketCall(unittest.TestCase):
         client = TestClient(app)
         
         with client.websocket_connect("/ws/call?call_id=test-call-outage&user_id=user-uuid-123") as websocket:
+            self._consume_welcome(websocket, "en-IN")
             # Turn 1: LLM fails first and second attempt -> llm_reply is None. Count becomes 1. Plays fallback.
             websocket.send_bytes(b"audio-1")
             self.assertEqual(websocket.receive_json(), {"status": "transcribed", "text": "Hello"})
@@ -406,7 +432,7 @@ class TestWebSocketCall(unittest.TestCase):
             yield "Hi"
         mock_llm.side_effect = mock_hi_stream
         
-        async def mock_stream(text, language_code):
+        async def mock_stream(text, language_code, *args, **kwargs):
             yield b"tts"
         mock_tts_stream.side_effect = mock_stream
         

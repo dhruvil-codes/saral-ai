@@ -483,29 +483,6 @@ async def websocket_call(websocket: WebSocket, language: str = "en-IN", call_id:
 
                     buffering_overhead_ms = int(round((stt_trigger_time - turn_start_time) * 1000))
 
-                    t_first_chunk = turn_start_time
-                    t_speech_start = speech_start_time if speech_start_time is not None else turn_start_time
-                    t_speech_end = stt_trigger_time - (silence_wait_ms / 1000.0)
-                    t_vad_fired = stt_trigger_time
-
-                    sub_a_ms = int(round((t_speech_start - t_first_chunk) * 1000.0))
-                    sub_b_ms = int(round((t_speech_end - t_speech_start) * 1000.0))
-                    sub_c_ms = int(round((t_vad_fired - t_speech_end) * 1000.0))
-
-                    logger.info(
-                        f"[VAD_DIAGNOSTICS] buffering_overhead_ms={buffering_overhead_ms} | "
-                        f"(a) first_chunk_to_speech_start_ms={sub_a_ms} | "
-                        f"(b) speech_start_to_speech_end_ms={sub_b_ms} | "
-                        f"(c) silence_gate_wait_ms={sub_c_ms}"
-                    )
-                    print(
-                        f"\n[VAD_DIAGNOSTICS] buffering_overhead_ms={buffering_overhead_ms} | "
-                        f"(a) first_chunk_to_speech_start_ms={sub_a_ms} | "
-                        f"(b) speech_start_to_speech_end_ms={sub_b_ms} | "
-                        f"(c) silence_gate_wait_ms={sub_c_ms}\n",
-                        flush=True
-                    )
-
                     vad_detector.reset()
                     turn_start_time = None
                     speech_start_time = None

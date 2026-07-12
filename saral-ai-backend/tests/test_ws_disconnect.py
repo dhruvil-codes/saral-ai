@@ -32,7 +32,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -48,7 +48,27 @@ BACKEND_URL = os.getenv("TEST_WS_URL", "ws://localhost:8000")
 USER_ID = "7326aea2-7ba1-4862-9e99-595080cbdd35"
 
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_ws_disconnect():
+    # Check Supabase credentials, skip if not set
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    if not url or not key or url == "placeholder-supabase-url" or key == "placeholder-supabase-key" or url == "placeholder" or key == "placeholder":
+        pytest.skip("Supabase credentials not configured in environment")
+
+    # Check if backend server is running, skip if not
+    import httpx
+    http_url = BACKEND_URL.replace("ws://", "http://").replace("wss://", "https://")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/health", timeout=1.0)
+            if resp.status_code != 200 or resp.json().get("status") != "ok":
+                pytest.skip("Backend server not running or unhealthy. Skipping live test.")
+    except Exception:
+        pytest.skip("Backend server not running or unhealthy. Skipping live test.")
+
     print("=" * 60)
     print("Stage 2 Triage — Real WebSocket Disconnect Integration Test")
     print("=" * 60)
