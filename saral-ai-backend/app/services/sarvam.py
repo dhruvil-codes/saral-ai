@@ -151,7 +151,8 @@ def text_to_speech(
     text: str,
     language_code: str,
     speech_sample_rate: int = 16000,
-    output_format: str = "mp3"
+    output_format: str = "mp3",
+    speaker: str = "shruti"
 ) -> bytes:
     """
     Converts the input text into raw audio bytes using Sarvam AI's text-to-speech API.
@@ -161,6 +162,7 @@ def text_to_speech(
         language_code (str): The target language (e.g., 'en-IN', 'hi-IN').
         speech_sample_rate (int): The audio sample rate (default 16000).
         output_format (str): The audio format (default 'mp3').
+        speaker (str): The voice ID to use (default 'shruti').
 
     Returns:
         bytes: The decoded raw audio bytes.
@@ -195,7 +197,7 @@ def text_to_speech(
     payload = {
         "text": text,
         "model": "bulbul:v3",
-        "speaker": "shruti",
+        "speaker": speaker,
         "target_language_code": normalized_lang,
         "pace": 1.0,
         "speech_sample_rate": speech_sample_rate,
@@ -249,7 +251,8 @@ async def text_to_speech_stream(
     text: str,
     language_code: str,
     speech_sample_rate: int = 16000,
-    output_audio_codec: str = "mp3"
+    output_audio_codec: str = "mp3",
+    speaker: str = "shruti"
 ):
     """
     Converts the input text into a stream of audio bytes using Sarvam AI's streaming text-to-speech API.
@@ -259,6 +262,7 @@ async def text_to_speech_stream(
         language_code (str): The target language (e.g., 'en-IN', 'hi-IN').
         speech_sample_rate (int): The audio sample rate (default 16000).
         output_audio_codec (str): The audio codec (default 'mp3').
+        speaker (str): The voice ID to use (default 'shruti').
 
     Yields:
         bytes: Chunks of audio bytes as they arrive from the API.
@@ -292,7 +296,7 @@ async def text_to_speech_stream(
     payload = {
         "text": text,
         "model": "bulbul:v3",
-        "speaker": "shruti",
+        "speaker": speaker,
         "target_language_code": normalized_lang,
         "pace": 1.0,
         "speech_sample_rate": speech_sample_rate,
