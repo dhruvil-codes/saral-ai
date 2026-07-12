@@ -252,95 +252,78 @@ export function HeadlessFeatureStep() {
 
 // ── Step 2 Component: HeadlessRoleStep ──
 
-export function HeadlessRoleStep() {
-  const [selectedRole, setSelectedRole] = useState<string>("retail")
-  const [selectedGoals, setSelectedGoals] = useState<string[]>(["lead-gen"])
+interface RoleStepProps {
+  businessName: string
+  setBusinessName: (val: string) => void
+  whatsappNumber: string
+  setWhatsappNumber: (val: string) => void
+  vadThresholdMs: number
+  setVadThresholdMs: (val: number) => void
+}
 
-  const toggleGoal = (goalId: string) => {
-    setSelectedGoals((prev) =>
-      prev.includes(goalId)
-        ? prev.filter((id) => id !== goalId)
-        : [...prev, goalId]
-    )
-  }
-
+export function HeadlessRoleStep({
+  businessName,
+  setBusinessName,
+  whatsappNumber,
+  setWhatsappNumber,
+  vadThresholdMs,
+  setVadThresholdMs,
+}: RoleStepProps) {
   return (
-    <div className="space-y-5 max-h-[360px] overflow-y-auto pr-1">
-      {/* Role Selection */}
-      <div className="space-y-2.5">
+    <div className="space-y-4 pr-1">
+      {/* Clinic Name Input */}
+      <div className="space-y-1.5">
         <label className="text-xs font-sans font-semibold uppercase tracking-wider text-muted-foreground">
-          What is your business type?
+          Clinic / Business Name
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          {ROLES.map((role) => {
-            const Icon = role.icon
-            const isSelected = selectedRole === role.id
-            return (
-              <button
-                key={role.id}
-                type="button"
-                onClick={() => setSelectedRole(role.id)}
-                className={cn(
-                  "flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer",
-                  isSelected
-                    ? "bg-[#f5a623]/10 border-[#f5a623]/60 ring-1 ring-[#f5a623]/30 text-foreground font-medium"
-                    : "bg-card border-border/60 hover:bg-muted/40 text-muted-foreground"
-                )}
-              >
-                <div
-                  className={cn(
-                    "size-7 rounded-lg flex items-center justify-center shrink-0 transition-colors",
-                    isSelected
-                      ? "bg-[#f5a623] text-black"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  <Icon className="size-3.5" />
-                </div>
-                <span className="text-xs font-sans leading-tight">
-                  {role.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        <input
+          type="text"
+          value={businessName}
+          onChange={(e) => setBusinessName(e.target.value)}
+          placeholder="e.g. City Physiotherapy Clinic"
+          className="w-full px-3.5 py-2 text-sm font-sans rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors"
+        />
       </div>
 
-      {/* Goal Selection */}
-      <div className="space-y-2.5">
+      {/* WhatsApp Number Input */}
+      <div className="space-y-1.5">
         <label className="text-xs font-sans font-semibold uppercase tracking-wider text-muted-foreground">
-          What are your primary goals?
+          WhatsApp Notification Number
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {GOALS.map((goal) => {
-            const isSelected = selectedGoals.includes(goal.id)
-            return (
-              <button
-                key={goal.id}
-                type="button"
-                onClick={() => toggleGoal(goal.id)}
-                className={cn(
-                  "flex items-center justify-between p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer",
-                  isSelected
-                    ? "bg-[#f5a623]/10 border-[#f5a623]/60 text-foreground font-medium"
-                    : "bg-card border-border/60 hover:bg-muted/40 text-muted-foreground"
-                )}
-              >
-                <span className="text-xs font-sans">{goal.label}</span>
-                <div
-                  className={cn(
-                    "size-4 rounded-md border flex items-center justify-center transition-colors",
-                    isSelected
-                      ? "bg-[#f5a623] border-[#f5a623] text-black"
-                      : "border-muted-foreground/30 bg-background"
-                  )}
-                >
-                  {isSelected && <Check className="size-3 stroke-[3]" />}
-                </div>
-              </button>
-            )
-          })}
+        <input
+          type="tel"
+          value={whatsappNumber}
+          onChange={(e) => setWhatsappNumber(e.target.value)}
+          placeholder="e.g. +919999999999"
+          className="w-full px-3.5 py-2 text-sm font-sans rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-[#f5a623] focus:border-[#f5a623] transition-colors"
+        />
+        <p className="text-[11px] font-sans text-muted-foreground leading-normal">
+          We will send call summaries and lead alerts to this WhatsApp number. Format: Country code and number, e.g. +919999999999.
+        </p>
+      </div>
+
+      {/* Silence Tolerance / VAD Threshold */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-sans font-semibold uppercase tracking-wider text-muted-foreground">
+            Silence Tolerance (VAD)
+          </label>
+          <span className="text-xs font-sans font-semibold text-[#f5a623] bg-[#f5a623]/10 px-2 py-0.5 rounded-full">
+            {vadThresholdMs} ms
+          </span>
         </div>
+        <input
+          type="range"
+          min="600"
+          max="2000"
+          step="100"
+          value={vadThresholdMs}
+          onChange={(e) => setVadThresholdMs(Number(e.target.value))}
+          className="w-full accent-[#f5a623] cursor-pointer"
+        />
+        <p className="text-[11px] font-sans text-muted-foreground leading-normal">
+          How long the AI waits after you stop speaking before replying. Lower is faster but can interrupt; higher is safer.
+        </p>
       </div>
     </div>
   )
@@ -400,11 +383,31 @@ export function HeadlessOnboardingDemo({
 }: OnboardingDialogProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [isActivating, setIsActivating] = useState(false)
+  const [businessName, setBusinessName] = useState("")
+  const [whatsappNumber, setWhatsappNumber] = useState("")
+  const [vadThresholdMs, setVadThresholdMs] = useState(1000)
   const supabase = useMemo(() => createClient(), [])
   const totalSteps = STEP_CONFIG.length
   const stepInfo = STEP_CONFIG[currentStep]
 
   const handleNext = async () => {
+    if (currentStep === 1) {
+      if (!businessName.trim()) {
+        toast.error("Please enter your Clinic / Business Name")
+        return
+      }
+      if (!whatsappNumber.trim()) {
+        toast.error("Please enter your WhatsApp Number")
+        return
+      }
+      // Simple E.164 verification: must start with + and contain only digits after
+      const phoneRegex = /^\+[1-9]\d{1,14}$/
+      if (!phoneRegex.test(whatsappNumber.trim())) {
+        toast.error("WhatsApp number must be in international E.164 format, e.g. +919999999999")
+        return
+      }
+    }
+
     if (currentStep < totalSteps - 1) {
       setCurrentStep((prev) => prev + 1)
     } else {
@@ -427,6 +430,9 @@ export function HeadlessOnboardingDemo({
             },
             body: JSON.stringify({
               saral_active: true,
+              business_name: businessName,
+              whatsapp_number: whatsappNumber,
+              vad_threshold_ms: vadThresholdMs,
             }),
           })
 
@@ -462,7 +468,6 @@ export function HeadlessOnboardingDemo({
     }
   }
 
-
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep((prev) => prev - 1)
@@ -495,7 +500,16 @@ export function HeadlessOnboardingDemo({
 
         <OnboardingWrapper>
           {currentStep === 0 && <HeadlessFeatureStep />}
-          {currentStep === 1 && <HeadlessRoleStep />}
+          {currentStep === 1 && (
+            <HeadlessRoleStep
+              businessName={businessName}
+              setBusinessName={setBusinessName}
+              whatsappNumber={whatsappNumber}
+              setWhatsappNumber={setWhatsappNumber}
+              vadThresholdMs={vadThresholdMs}
+              setVadThresholdMs={setVadThresholdMs}
+            />
+          )}
           {currentStep === 2 && <HeadlessTipsStep />}
         </OnboardingWrapper>
 
