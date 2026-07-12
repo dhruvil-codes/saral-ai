@@ -13,11 +13,11 @@ export type NavigationSection = {
 };
 
 const navigationData: NavigationSection[] = [
-  { title: "Products", href: "#" },
-  { title: "Services", href: "#" },
-  { title: "Apps", href: "#" },
-  { title: "Pricing", href: "#" },
-  { title: "About", href: "#" },
+  { title: "How it works", href: "#how-it-works" },
+  { title: "Features", href: "#features" },
+  { title: "Product", href: "#product" },
+  { title: "Use cases", href: "#use-cases" },
+  { title: "FAQ", href: "#faq" },
 ];
 
 const SaralLogo = ({ sticky }: { sticky: boolean }) => (
