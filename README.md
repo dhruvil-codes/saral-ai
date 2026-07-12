@@ -1,57 +1,125 @@
-# Saral AI — Multilingual Voice Intake & Triage Agent for Indian Clinics
+<div align="center">
 
-**AMD Developer Hackathon Act II — Track 3 (Unicorn)**
+# 🩺 Saral AI
 
-Saral AI is a multilingual voice AI agent built for small Indian clinics (physiotherapy/dental) that answers patient calls 24/7 in Hindi, Marathi, and English. It has a natural voice conversation to understand symptoms and needs, classifies urgency, captures booking details, and sends the clinic's front desk a structured case summary via WhatsApp — so no urgent call gets missed.
+### Multilingual Voice Intake & Triage Agent for Indian Clinics
 
-## The Problem
+*Built for AMD Developer Hackathon Act II — Track 3 (Unicorn)*
 
-Small clinics lose patients to missed calls, and — more critically — sometimes miss genuinely urgent cases because front-desk staff can't answer every call, especially after hours or during rush periods. Saral makes sure every call gets answered, understood, and triaged correctly.
+[![AMD](https://img.shields.io/badge/AMD-Fireworks%20AI-ED1C24?style=flat-square)](https://fireworks.ai)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Supabase](https://img.shields.io/badge/DB-Supabase-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)]()
 
-## How It Works
+**A patient calls. Saral answers — in Hindi, Marathi, or English — understands what's wrong, knows how urgent it is, and makes sure the clinic finds out immediately.**
+
+[Demo Video](#) · [Live App](#) · [Report Bug](#)
+
+</div>
+
+---
+
+## 🚨 The Problem
+
+Small clinics lose patients to missed calls — and worse, sometimes miss genuinely **urgent** cases because no one was free to pick up. A single overwhelmed front desk can't triage every caller correctly, especially after hours or in a caller's preferred language.
+
+## 💡 The Solution
+
+Saral AI is a **voice-first AI receptionist** purpose-built for physiotherapy and dental clinics in India. It doesn't just answer the phone — it *understands* the call.
 
 ```
-Caller voice → STT → AMD-hosted LLM reasoning → structured case + urgency
-extraction → TTS response → WhatsApp + dashboard
+📞 Patient calls  →  🎙️ Natural voice conversation (Hindi/Marathi/English)
+                  →  🧠 AMD-hosted LLM reasoning
+                  →  🚦 Urgency classification + structured intake
+                  →  💬 WhatsApp case card to clinic staff
+                  →  📊 Dashboard: call logs, case cards, config
 ```
 
-1. A patient calls the clinic and speaks naturally in Hindi/Marathi/English
-2. Saral answers, asks follow-up questions, and responds using the clinic's configured knowledge base (timings, fees, doctor availability, policies)
-3. When the call ends, a second AI stage extracts structured intake data and classifies urgency
-4. The clinic receives a WhatsApp case card with the caller's details, complaint, urgency level, and recommended action
-5. The clinic dashboard shows call logs, case cards, and clinic configuration
+No urgent call gets lost in translation — or lost at all.
 
-## AMD / Fireworks Usage
+---
 
-Saral AI runs two distinct AMD-hosted inference stages via Fireworks AI:
+## ✨ Features
 
-- **Stage 1 (live conversation):** `deepseek-v4-flash` handles real-time conversational reasoning during the call, with full token streaming into text-to-speech for low-latency responses.
-- **Stage 2 (post-call triage):** `minimax-m3` runs after the call ends to perform structured patient intake extraction and urgency classification.
+| | |
+|---|---|
+| 🗣️ **Real-time multilingual voice** | Fluid Hindi/Marathi/English conversation, streamed end-to-end |
+| 🏥 **Clinic-aware answering** | Grounded in real timings, doctor availability, fees, and policies |
+| 🚦 **Urgency triage** | Every call classified: urgent / same-day / routine / FAQ-only |
+| 📋 **Structured intake** | Name, complaint, patient type, requested slot — extracted automatically |
+| 💬 **WhatsApp case cards** | Clinic staff get a clean summary the moment a call ends |
+| 📅 **Live appointment booking** | Tool-calling agent holds and confirms real slots |
+| 📊 **Minimal dashboard** | Call logs, case cards, and clinic config — nothing you don't need |
 
-Sarvam AI handles Hindi/Marathi/English text-to-speech, and Groq Whisper handles speech-to-text (chosen after direct comparison testing showed superior mixed-script Hindi/Hinglish transcription — see `docs/` for the comparison, if included).
+---
 
-## Tech Stack
+## 🏗️ Architecture
 
-- **Backend:** FastAPI (Python), WebSocket-based real-time voice pipeline
-- **Frontend:** Next.js (React, TypeScript)
-- **Database:** Supabase (Postgres)
-- **LLM Inference:** Fireworks AI (AMD-hosted) — deepseek-v4-flash + minimax-m3
-- **STT:** Groq Whisper (whisper-large-v3)
-- **TTS:** Sarvam AI (bulbul:v3)
-- **Notifications:** Twilio WhatsApp (free-form messaging)
-- **VAD:** webrtcvad with pre-speech rolling buffer
+```
+                    ┌─────────────────────────────────────┐
+                    │           Caller (Voice)             │
+                    └──────────────────┬────────────────────┘
+                                       │
+                          Speech-to-Text (Groq Whisper)
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │   Stage 1 — Live Conversation          │
+                    │   deepseek-v4-flash (Fireworks / AMD)  │
+                    │   streamed, sentence-by-sentence TTS   │
+                    └──────────────────┬────────────────────┘
+                                       │
+                          Text-to-Speech (Sarvam AI)
+                                       │
+                                  Call ends
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │   Stage 2 — Structured Triage           │
+                    │   minimax-m3 (Fireworks / AMD)          │
+                    │   urgency + intake extraction           │
+                    └──────────────────┬────────────────────┘
+                                       │
+                       ┌───────────────┴───────────────┐
+                       ▼                                ▼
+              WhatsApp Case Card                 Dashboard
+              (Twilio)                            (Call Logs, Case Cards)
+```
 
-## Features
+**Two distinct AMD-hosted inference stages, each doing a genuinely different job** — not one API call re-labeled twice.
 
-- Real-time multilingual voice conversation (Hindi/Marathi/English)
-- Clinic knowledge grounding (timings, doctor availability, fees, location, policies)
-- Structured intake extraction (name, complaint, urgency, requested slot, patient type)
-- Urgency/callback priority classification (urgent / same-day / routine / FAQ-only)
-- Automated WhatsApp case card delivery to clinic staff
-- Minimal clinic dashboard: call logs, case cards, FAQ/config
-- Clinic setup UI with WhatsApp number configuration and Saral activation toggle
+---
 
-## Setup & Installation
+## 🔥 AMD / Fireworks Usage
+
+> Saral AI runs its entire reasoning pipeline on AMD-hosted infrastructure via Fireworks AI:
+>
+> - **Stage 1** — `deepseek-v4-flash` handles live conversational reasoning, fully streamed into text-to-speech for natural, low-latency dialogue.
+> - **Stage 2** — `minimax-m3` runs post-call to extract structured patient intake and classify urgency.
+> - A dedicated tool-calling model handles appointment hold/confirm operations reliably.
+
+---
+
+## 🛠️ Tech Stack
+
+<div align="center">
+
+| Layer | Technology |
+|---|---|
+| **LLM Inference** | Fireworks AI (AMD-hosted) |
+| **Backend** | FastAPI · Python · WebSockets |
+| **Frontend** | Next.js · TypeScript · Tailwind |
+| **Database** | Supabase (Postgres + pgvector) |
+| **STT** | Groq Whisper (whisper-large-v3) |
+| **TTS** | Sarvam AI (bulbul:v3) |
+| **Cache** | Redis (Upstash) |
+| **Notifications** | Twilio WhatsApp |
+| **VAD** | webrtcvad + pre-speech rolling buffer |
+
+</div>
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
@@ -65,8 +133,7 @@ Sarvam AI handles Hindi/Marathi/English text-to-speech, and Groq Whisper handles
 ```bash
 cd saral-ai-backend
 pip install -r requirements.txt --break-system-packages
-cp .env.example .env
-# Fill in your API keys in .env
+cp .env.example .env   # fill in your keys
 uvicorn app.main:app
 ```
 
@@ -77,9 +144,15 @@ npm install
 npm run dev
 ```
 
+### 🐳 Docker
+
+```bash
+docker-compose up --build
+```
+
 ### Environment Variables
 
-```
+```env
 FIREWORKS_API_KEY=
 FIREWORKS_MODEL=accounts/fireworks/models/deepseek-v4-flash
 GROQ_API_KEY=
@@ -91,27 +164,39 @@ SUPABASE_URL=
 SUPABASE_KEY=
 ```
 
-### Docker
+---
 
-```bash
-docker-compose up --build
-```
+## 📖 Usage
 
-## Usage
+1. **Sign up** and complete the onboarding wizard
+2. **Configure your clinic** — timings, doctors, fees, FAQ, WhatsApp number
+3. **Activate Saral** with a single toggle
+4. **Test the live agent** through the built-in call interface
+5. **Watch case cards land** on WhatsApp and in your dashboard, automatically
 
-1. Sign up / log in to the dashboard
-2. Configure your clinic: name, timings, doctor availability, fees, FAQ entries
-3. Add your WhatsApp number to receive case card notifications (Twilio Sandbox requires a one-time opt-in — send `join <sandbox-word>` to the Twilio WhatsApp number from your configured number)
-4. Toggle Saral to Active
-5. Test the voice agent via the live call interface
-6. Review call logs and case cards in the dashboard; case cards are also delivered automatically to your WhatsApp
+> 📱 Twilio Sandbox requires a one-time opt-in — text `join <sandbox-word>` to the Twilio WhatsApp number from your configured clinic number.
 
-## Known Limitations (Hackathon Scope)
+---
 
-- Twilio WhatsApp integration uses the free Sandbox tier, which requires manual opt-in per recipient number (not production-grade WhatsApp Business API)
-- No real telephony/PSTN integration — the voice agent is demonstrated via a WebSocket-based test interface rather than a live phone number
-- STT fallback (Sarvam) is currently non-functional due to a quota issue on the trial account; Groq Whisper is the sole active STT provider
+## ⚠️ Known Limitations (Hackathon Scope)
 
-## License
+- Twilio WhatsApp runs on the free Sandbox tier — manual opt-in per number, not production WhatsApp Business API
+- No real PSTN telephony — demonstrated via a WebSocket-based live call interface
+- STT fallback provider is currently inactive due to a trial quota limit; primary provider is fully functional
 
-Built for AMD Developer Hackathon Act II, July 2026.
+---
+
+## 🗺️ Roadmap
+
+- [ ] Real telephony integration (dedicated clinic phone numbers)
+- [ ] Production WhatsApp Business API
+- [ ] Additional regional languages
+- [ ] Deeper AMD Developer Cloud usage (ROCm-hosted embeddings)
+
+---
+
+<div align="center">
+
+**Built with ☕ and a lot of debugging for AMD Developer Hackathon Act II**
+
+</div>
