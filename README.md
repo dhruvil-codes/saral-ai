@@ -15,6 +15,7 @@
 **A patient calls. Saral answers — in Hindi, Marathi, or English — understands what's wrong, knows how urgent it is, and makes sure the clinic finds out immediately.**
 
 [Demo Video](#) · [Live App](#) · [Report Bug](#)
+<img width="1905" height="951" alt="Saral AI Hero v1" src="https://github.com/user-attachments/assets/f93acdbf-80c3-45bc-82b4-40a7e34fd38a" />
 
 </div>
 
