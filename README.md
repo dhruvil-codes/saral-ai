@@ -4,8 +4,6 @@
 
 ### Multilingual Voice Intake & Triage Agent for Indian Clinics
 
-*Built for AMD Developer Hackathon Act II — Track 3 (Unicorn)*
-
 [![AMD](https://img.shields.io/badge/AMD-Fireworks%20AI-ED1C24?style=flat-square)](https://fireworks.ai)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
@@ -197,7 +195,4 @@ SUPABASE_KEY=
 ---
 
 <div align="center">
-
-**Built with ☕ and a lot of debugging for AMD Developer Hackathon Act II**
-
 </div>
